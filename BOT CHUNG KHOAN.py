@@ -3,6 +3,7 @@ import yfinance as yf
 import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
+import streamlit.components.v1 as components # Thêm thư viện để xử lý JavaScript
 
 # --- CẤU HÌNH TRANG WEB ---
 st.set_page_config(layout="wide", page_title="Stock Advisor PRO", page_icon="📈")
@@ -17,11 +18,10 @@ st.markdown("""
         font-family: 'Roboto', 'Segoe UI', sans-serif;
     }
     
-    /* 2. HEADER - MÀU XANH TĂNG TRƯỞNG */
+    /* 2. HEADER */
     .main-title {
         text-align: center;
         font-weight: 900;
-        /* Gradient Xanh Lá */
         background: -webkit-linear-gradient(45deg, #00E676, #69F0AE); 
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
@@ -32,10 +32,9 @@ st.markdown("""
         text-shadow: 0px 0px 20px rgba(0, 230, 118, 0.3);
     }
     
-    /* SUBTITLE - MÀU SÁNG RÕ RÀNG */
     .sub-title {
         text-align: center;
-        color: #E0E0E0 !important; /* Màu trắng xám sáng */
+        color: #E0E0E0 !important;
         font-size: 1.2rem;
         font-weight: 400;
         margin-bottom: 30px;
@@ -70,7 +69,7 @@ st.markdown("""
         margin-top: 10px;
     }
     .report-header {
-        color: #00E676; /* Màu xanh tiêu đề */
+        color: #00E676;
         font-size: 1.2rem;
         font-weight: bold;
         margin-bottom: 15px;
@@ -81,32 +80,54 @@ st.markdown("""
     .report-item { margin-bottom: 12px; font-size: 1rem; color: #FAFAFA; display: flex; align-items: center; }
     .icon-dot { margin-right: 12px; font-size: 1.2rem; }
 
-    /* 5. METRIC CARDS - FIXED LAYOUT */
+    /* 5. METRIC CARDS - ĐÃ SỬA CĂN CHỈNH */
     .metric-container {
         background-color: #262730;
         border: 1px solid #41424C;
         border-radius: 12px;
-        padding: 15px;
+        padding: 15px 10px; /* Padding trên dưới */
         text-align: center;
-        height: 140px; /* Chiều cao cố định để đều nhau */
+        height: 160px; /* Tăng chiều cao cố định */
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-start; /* Căn từ trên xuống để tiêu đề thẳng hàng */
+        align-items: center;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+    }
+    
+    /* Label sáng rõ hơn */
+    .metric-label { 
+        font-size: 0.9rem; 
+        color: #FFF; /* Chuyển sang màu trắng */
+        font-weight: 700; /* In đậm */
+        margin-bottom: 15px; /* Cách xa số liệu một chút */
+        text-transform: uppercase; 
+        letter-spacing: 1px;
+        height: 20px; /* Cố định chiều cao label */
+        display: flex;
+        align-items: center;
+    }
+    
+    /* Value căn giữa phần còn lại */
+    .metric-value-box {
+        flex-grow: 1;
         display: flex;
         flex-direction: column;
         justify-content: center;
         align-items: center;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.2);
     }
-    .metric-label { font-size: 0.85rem; color: #BBB; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 1px; }
-    .metric-value { font-size: 2rem; font-weight: 900; color: #FFF; line-height: 1.2; }
+
+    .metric-value { font-size: 2.2rem; font-weight: 900; color: #FFF; line-height: 1; }
     
-    /* Trend Badge to hơn, đẹp hơn */
+    /* Trend Badge TO HƠN */
     .trend-badge { 
-        padding: 8px 20px; 
-        border-radius: 20px; 
-        font-size: 1.1rem; 
-        font-weight: bold; 
+        padding: 10px 30px; 
+        border-radius: 30px; 
+        font-size: 1.3rem; /* Chữ to hơn */
+        font-weight: 900; 
         color: white; 
         display: inline-block;
-        box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+        box-shadow: 0 4px 10px rgba(0,0,0,0.5);
     }
     
     /* 6. FOOTER */
@@ -121,7 +142,7 @@ st.markdown("""
     }
     .footer-warning { color: #FF5252; font-weight: bold; margin-bottom: 8px; font-size: 1rem; }
     
-    /* 7. NÚT BẤM (Custom Button Style nếu cần, nhưng streamlit mặc định đã ổn) */
+    /* 7. Button */
     div.stButton > button {
         width: 100%;
         border-radius: 8px;
@@ -236,7 +257,7 @@ def analyze_strategy(df):
     if rsi < 30: rsi_state = "<span style='color:#4CAF50; font-weight:bold'>QUÁ BÁN (Cơ hội)</span>"
     elif rsi > 70: rsi_state = "<span style='color:#FF5252; font-weight:bold'>QUÁ MUA (Rủi ro)</span>"
     
-    trend_color = "#00E676" if di_plus > di_minus else "#FF5252" # Xanh/Đỏ
+    trend_color = "#00E676" if di_plus > di_minus else "#FF5252" 
 
     report = f"""
     <div class='report-box'>
@@ -250,7 +271,7 @@ def analyze_strategy(df):
              
     return rec, reason, color_class, report
 
-# --- HÀM RENDER METRIC ---
+# --- HÀM RENDER METRIC (ĐÃ SỬA ALIGNMENT) ---
 def render_metric_card(label, value, delta=None, color=None):
     delta_html = ""
     if delta is not None:
@@ -265,8 +286,10 @@ def render_metric_card(label, value, delta=None, color=None):
     st.markdown(f"""
     <div class='metric-container'>
         <div class='metric-label'>{label}</div>
-        {value_html}
-        {delta_html}
+        <div class='metric-value-box'>
+            {value_html}
+            {delta_html}
+        </div>
     </div>
     """, unsafe_allow_html=True)
 
@@ -275,18 +298,27 @@ def render_metric_card(label, value, delta=None, color=None):
 st.markdown("<h1 class='main-title'>STOCK ADVISOR PRO</h1>", unsafe_allow_html=True)
 st.markdown("<p class='sub-title'>Hệ thống Hỗ trợ Phân tích & Quản trị Rủi ro Đầu tư</p>", unsafe_allow_html=True)
 
-# --- FORM NHẬP LIỆU (ĐÃ SỬA: Nút ở dưới, Ô nhập trống) ---
-col1, col2, col3 = st.columns([1, 1.5, 1]) # Thu hẹp cột giữa lại cho cân đối
+# FORM
+col1, col2, col3 = st.columns([1, 1.5, 1])
 with col2:
     with st.form(key='search_form'):
-        # Ô nhập liệu (Value để trống)
         ticker_input = st.text_input("Nhập mã cổ phiếu:", value="", placeholder="Ví dụ: HPG, VNM, FPT...").upper()
-        
-        # Nút bấm (Full width)
         submit_button = st.form_submit_button(label='🚀 PHÂN TÍCH NGAY', use_container_width=True)
 
-# LOGIC XỬ LÝ
 if submit_button:
+    # --- JS HACK ĐỂ NHẢ FOCUS (BLUR) ---
+    components.html("""
+        <script>
+            // Đợi 1 chút để đảm bảo DOM đã render
+            setTimeout(function(){
+                var input = window.parent.document.querySelectorAll("input[type='text']");
+                for (var i = 0; i < input.length; i++) {
+                    input[i].blur(); // Nhả chuột ra
+                }
+            }, 100);
+        </script>
+    """, height=0)
+
     ticker = ticker_input.strip()
     
     if not ticker:
@@ -316,10 +348,10 @@ if submit_button:
                     </div>
                     """, unsafe_allow_html=True)
                     
-                    # 2. BÁO CÁO CHI TIẾT
+                    # 2. BÁO CÁO
                     st.markdown(report, unsafe_allow_html=True)
                     
-                    # 3. CHỈ SỐ (Đã sửa CSS Flexbox cho đẹp)
+                    # 3. CHỈ SỐ
                     st.markdown("<br>", unsafe_allow_html=True)
                     col_m1, col_m2, col_m3, col_m4 = st.columns(4)
                     
@@ -331,25 +363,49 @@ if submit_button:
                         render_metric_card("ADX (14)", f"{curr['ADX']:.1f}", curr['ADX'] - prev['ADX'])
                     with col_m4:
                         trend_txt = "TĂNG" if curr['+DI'] > curr['-DI'] else "GIẢM"
-                        # Màu xu hướng: Tăng (Xanh lá), Giảm (Đỏ)
                         trend_col = "#00E676" if trend_txt == "TĂNG" else "#FF5252"
                         render_metric_card("XU HƯỚNG", trend_txt, None, color=trend_col)
 
-                    # 4. BIỂU ĐỒ (TÁCH RIÊNG 3 CÁI)
+                    # 4. BIỂU ĐỒ (TÁCH RIÊNG 3 CÁI & CẢI THIỆN BB)
                     st.markdown("<br>", unsafe_allow_html=True)
                     st.divider()
                     
-                    # --- CHART 1: GIÁ & BB ---
+                    # --- CHART 1: GIÁ & BB (CẢI TIẾN) ---
                     st.markdown(f"### 📊 Biểu đồ Giá & Bollinger Bands ({ticker})")
                     fig1 = go.Figure()
-                    fig1.add_trace(go.Candlestick(x=df.index, open=df['Open'], high=df['High'], low=df['Low'], close=df['Close'], name="Giá"))
-                    fig1.add_trace(go.Scatter(x=df.index, y=df['Upper'], line=dict(color='rgba(255,255,255,0.4)', width=1, dash='dash'), name="Upper Band"))
-                    fig1.add_trace(go.Scatter(x=df.index, y=df['Lower'], line=dict(color='rgba(255,255,255,0.4)', width=1, dash='dash'), name="Lower Band"))
+                    
+                    # Dải dưới (Không màu, chỉ để tạo giới hạn)
+                    fig1.add_trace(go.Scatter(
+                        x=df.index, y=df['Lower'],
+                        line=dict(color='rgba(255, 255, 255, 0)'), # Ẩn đường viền dưới
+                        showlegend=False,
+                        name="Lower Band"
+                    ))
+
+                    # Dải trên (Tô màu xuống dải dưới - Fill Area)
+                    fig1.add_trace(go.Scatter(
+                        x=df.index, y=df['Upper'],
+                        fill='tonexty', # Tô đầy đến trace trước đó (Lower)
+                        fillcolor='rgba(0, 230, 118, 0.1)', # Màu xanh nhạt trong suốt (BB Cloud)
+                        line=dict(color='rgba(255, 255, 255, 0)'), # Ẩn đường viền trên
+                        showlegend=False,
+                        name="Upper Band"
+                    ))
+                    
+                    # Vẽ lại 2 đường viền BB cho rõ (Màu Cyan sáng)
+                    fig1.add_trace(go.Scatter(x=df.index, y=df['Upper'], line=dict(color='#00E5FF', width=1.5), name="Upper Band"))
+                    fig1.add_trace(go.Scatter(x=df.index, y=df['Lower'], line=dict(color='#00E5FF', width=1.5), name="Lower Band"))
+                    
+                    # Đường giữa SMA20
                     fig1.add_trace(go.Scatter(x=df.index, y=df['SMA20'], line=dict(color='#FF914D', width=1.5), name="SMA 20"))
                     
-                    fig1.update_layout(height=500, xaxis_rangeslider_visible=False, 
+                    # Nến Nhật
+                    fig1.add_trace(go.Candlestick(x=df.index, open=df['Open'], high=df['High'], low=df['Low'], close=df['Close'], name="Giá"))
+
+                    fig1.update_layout(height=550, xaxis_rangeslider_visible=False, 
                                       paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
                                       font=dict(color='#FAFAFA'), margin=dict(l=10, r=10, t=10, b=10))
+                    # Lưới mờ hơn
                     fig1.update_xaxes(showgrid=True, gridwidth=1, gridcolor='#333')
                     fig1.update_yaxes(showgrid=True, gridwidth=1, gridcolor='#333')
                     st.plotly_chart(fig1, use_container_width=True)
@@ -361,8 +417,8 @@ if submit_button:
                         st.markdown("### 🚀 Chỉ số RSI (14)")
                         fig2 = go.Figure()
                         fig2.add_trace(go.Scatter(x=df.index, y=df['RSI'], line=dict(color='#E040FB', width=2), name="RSI"))
-                        fig2.add_hline(y=70, line_dash="dot", line_color="#FF5252")
-                        fig2.add_hline(y=30, line_dash="dot", line_color="#00E676")
+                        fig2.add_hline(y=70, line_dash="dot", line_color="#FF5252", annotation_text="Quá Mua (70)")
+                        fig2.add_hline(y=30, line_dash="dot", line_color="#00E676", annotation_text="Quá Bán (30)")
                         
                         fig2.update_layout(height=350, xaxis_rangeslider_visible=False, 
                                           paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
@@ -375,9 +431,9 @@ if submit_button:
                     with col_c2:
                         st.markdown("### ⚖️ Chỉ số ADX & DI")
                         fig3 = go.Figure()
-                        fig3.add_trace(go.Scatter(x=df.index, y=df['ADX'], line=dict(color='white', width=2), name="ADX"))
-                        fig3.add_trace(go.Scatter(x=df.index, y=df['+DI'], line=dict(color='#00E676', width=1.5), name="+DI"))
-                        fig3.add_trace(go.Scatter(x=df.index, y=df['-DI'], line=dict(color='#FF5252', width=1.5), name="-DI"))
+                        fig3.add_trace(go.Scatter(x=df.index, y=df['ADX'], line=dict(color='white', width=2), name="ADX (Sức mạnh)"))
+                        fig3.add_trace(go.Scatter(x=df.index, y=df['+DI'], line=dict(color='#00E676', width=1.5), name="+DI (Mua)"))
+                        fig3.add_trace(go.Scatter(x=df.index, y=df['-DI'], line=dict(color='#FF5252', width=1.5), name="-DI (Bán)"))
                         fig3.add_hline(y=25, line_dash="dot", line_color="gray")
                         
                         fig3.update_layout(height=350, xaxis_rangeslider_visible=False, 
@@ -390,7 +446,7 @@ if submit_button:
             except Exception as e:
                 st.error(f"Đã xảy ra lỗi hệ thống: {e}")
 
-# Footer (Sáng rõ hơn)
+# Footer
 st.markdown("---")
 st.markdown("""
 <div class='footer-box'>
