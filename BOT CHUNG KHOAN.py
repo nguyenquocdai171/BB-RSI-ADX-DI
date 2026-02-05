@@ -8,44 +8,97 @@ from plotly.subplots import make_subplots
 # --- CẤU HÌNH TRANG WEB ---
 st.set_page_config(layout="wide", page_title="Stock Advisor PRO", page_icon="📈")
 
-# --- CSS TÙY CHỈNH (LÀM ĐẸP GIAO DIỆN) ---
+# --- CSS TÙY CHỈNH (LÀM ĐẸP GIAO DIỆN DARK MODE) ---
 st.markdown("""
 <style>
-    /* Chỉnh Font chữ toàn bộ web sang Sans-serif cho đẹp, bỏ font code cũ */
+    /* Chỉnh Font chữ toàn bộ web */
     html, body, [class*="css"] {
         font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
     }
     
-    /* Căn giữa tiêu đề */
+    /* Tiêu đề chính */
     .main-title {
         text-align: center;
-        font-weight: bold;
-        color: #FF4B4B;
-        font-size: 3rem;
-        margin-bottom: 0px;
+        font-weight: 800;
+        background: -webkit-linear-gradient(45deg, #FF4B4B, #FF914D);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        font-size: 3.5rem;
+        margin-bottom: 10px;
+        padding-top: 20px;
     }
     
-    /* Style cho khung báo cáo chi tiết để không bị xấu */
+    /* Sub-title */
+    .sub-title {
+        text-align: center;
+        color: #aaaaaa;
+        font-size: 1.2rem;
+        margin-bottom: 30px;
+    }
+
+    /* Khung báo cáo phân tích */
     .report-box {
-        background-color: #f0f2f6;
-        border-radius: 10px;
-        padding: 20px;
-        border-left: 5px solid #FF4B4B;
+        background-color: #262730; /* Màu nền card tối */
+        border: 1px solid #41424C;
+        border-radius: 12px;
+        padding: 25px;
         margin-top: 20px;
-        color: #31333F; /* Màu chữ tối cho dễ đọc trên nền sáng */
+        margin-bottom: 30px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
     }
-    
-    /* Dark mode support cho report box */
-    @media (prefers-color-scheme: dark) {
-        .report-box {
-            background-color: #262730;
-            color: #FAFAFA;
-        }
+    .report-box h4 {
+        color: #FF4B4B;
+        border-bottom: 1px solid #41424C;
+        padding-bottom: 10px;
+        margin-bottom: 15px;
+    }
+    .report-box ul {
+        list-style-type: none;
+        padding: 0;
+    }
+    .report-box li {
+        margin-bottom: 10px;
+        font-size: 1.05rem;
+    }
+    .highlight {
+        color: #FF914D;
+        font-weight: bold;
+    }
+
+    /* Style cho Metric Box tùy chỉnh */
+    .metric-container {
+        background-color: #1E1E1E;
+        border: 1px solid #333;
+        border-radius: 10px;
+        padding: 15px;
+        text-align: center;
+        height: 100%;
+    }
+    .metric-label {
+        font-size: 0.9rem;
+        color: #888;
+        margin-bottom: 5px;
+    }
+    .metric-value {
+        font-size: 1.8rem;
+        font-weight: bold;
+        color: #FFF;
+    }
+    .metric-delta {
+        font-size: 0.9rem;
+        font-weight: 500;
+    }
+    .trend-badge {
+        padding: 5px 15px;
+        border-radius: 15px;
+        font-weight: bold;
+        color: white;
+        display: inline-block;
     }
 </style>
 """, unsafe_allow_html=True)
 
-# --- HÀM TÍNH TOÁN ---
+# --- HÀM TÍNH TOÁN (Giữ nguyên logic chuẩn) ---
 def calculate_indicators(df):
     # 1. BB
     df['SMA20'] = df['Close'].rolling(window=20).mean()
@@ -137,26 +190,27 @@ def analyze_strategy(df):
         else:
              rec, reason, color = "CÂN NHẮC BÁN", "Vùng quá mua, cân nhắc chốt lời.", "orange"
 
-    # --- REPORT TEXT (Đã sửa format Markdown) ---
+    # --- REPORT TEXT HTML ---
     trend_state = "TĂNG" if di_plus > di_minus else "GIẢM"
     trend_strength = "YẾU (Sideway)" if adx < 25 else ("CỰC MẠNH" if adx > 50 else "TRUNG BÌNH")
     
     price_pos = "trong biên độ an toàn"
-    if price <= lower_band * 1.01: price_pos = "chạm dải dưới (Rẻ)"
-    elif price >= upper_band * 0.99: price_pos = "chạm dải trên (Đắt)"
+    if price <= lower_band * 1.01: price_pos = "<span class='highlight'>chạm dải dưới (Rẻ)</span>"
+    elif price >= upper_band * 0.99: price_pos = "<span class='highlight'>chạm dải trên (Đắt)</span>"
     
     rsi_state = "Trung tính"
-    if rsi < 30: rsi_state = "QUÁ BÁN (Cơ hội mua)"
-    elif rsi > 70: rsi_state = "QUÁ MUA (Rủi ro chỉnh)"
+    if rsi < 30: rsi_state = "<span class='highlight'>QUÁ BÁN (Cơ hội)</span>"
+    elif rsi > 70: rsi_state = "<span class='highlight'>QUÁ MUA (Rủi ro)</span>"
+    
+    trend_color = "#4CAF50" if di_plus > di_minus else "#FF5252" # Xanh/Đỏ cho xu hướng
 
-    # Sử dụng HTML/Markdown chuẩn để không bị lỗi font
     report = f"""
     <div class='report-box'>
-        <h4>📝 Phân Tích Chi Tiết</h4>
+        <h4>📝 PHÂN TÍCH CHI TIẾT</h4>
         <ul>
-            <li><b>Xu hướng:</b> Thị trường đang trong pha <b>{trend_state}</b> với cường độ <b>{trend_strength}</b> (ADX={adx:.1f}).</li>
-            <li><b>Vị thế giá:</b> Giá hiện tại đang <b>{price_pos}</b> của Bollinger Bands.</li>
-            <li><b>Động lượng (RSI):</b> Chỉ số RSI đạt {rsi:.1f}, trạng thái <b>{rsi_state}</b>.</li>
+            <li><b>Xu hướng:</b> Thị trường đang <b style='color:{trend_color}'>{trend_state}</b> với cường độ <b>{trend_strength}</b> (ADX={adx:.1f}).</li>
+            <li><b>Vị thế giá:</b> Giá hiện tại đang {price_pos} của Bollinger Bands.</li>
+            <li><b>Động lượng (RSI):</b> Chỉ số RSI đạt <b>{rsi:.1f}</b>, trạng thái <b>{rsi_state}</b>.</li>
             <li><b>Tín hiệu ADX/DI:</b> { "Phe Mua đang kiểm soát (+DI > -DI)" if di_plus > di_minus else "Phe Bán đang kiểm soát (-DI > +DI)" }.</li>
         </ul>
     </div>
@@ -164,96 +218,140 @@ def analyze_strategy(df):
              
     return rec, reason, color, report
 
+# --- HÀM VẼ GIAO DIỆN CHỈ SỐ (METRIC CARD) ---
+def render_metric_card(label, value, delta=None, color=None):
+    delta_html = ""
+    if delta is not None:
+        delta_color = "#4CAF50" if delta > 0 else ("#FF5252" if delta < 0 else "#888")
+        arrow = "▲" if delta > 0 else ("▼" if delta < 0 else "")
+        delta_html = f"<div class='metric-delta' style='color: {delta_color};'>{arrow} {abs(delta):.1f}</div>"
+    
+    # Custom Trend Badge
+    value_html = f"<div class='metric-value'>{value}</div>"
+    if color: # Nếu là badge Xu hướng
+        value_html = f"<div class='trend-badge' style='background-color: {color};'>{value}</div>"
+
+    st.markdown(f"""
+    <div class='metric-container'>
+        <div class='metric-label'>{label}</div>
+        {value_html}
+        {delta_html}
+    </div>
+    """, unsafe_allow_html=True)
+
 # --- GIAO DIỆN CHÍNH ---
 
-st.markdown("<h1 class='main-title'>📈 STOCK ADVISOR PRO</h1>", unsafe_allow_html=True)
-st.markdown("<p style='text-align: center;'>Hệ thống phân tích kỹ thuật tự động: BB + RSI + ADX + DI</p>", unsafe_allow_html=True)
+st.markdown("<h1 class='main-title'>STOCK ADVISOR PRO</h1>", unsafe_allow_html=True)
+st.markdown("<p class='sub-title'>Hệ thống săn tìm điểm đảo chiều: BB + RSI + ADX + DI</p>", unsafe_allow_html=True)
 
-# 1. CĂN GIỮA THANH TÌM KIẾM VÀ XỬ LÝ ENTER
+# 1. FORM NHẬP LIỆU (CĂN GIỮA)
 col1, col2, col3 = st.columns([1, 2, 1])
-
 with col2:
     with st.form(key='search_form'):
-        # Tạo 2 cột bên trong form để nút nằm cạnh ô nhập (nếu muốn) hoặc dưới
-        col_input, col_btn = st.columns([3, 1])
-        with col_input:
-            ticker_input = st.text_input("Nhập mã cổ phiếu (VN):", "HPG", placeholder="Ví dụ: VNM, SSI...")
-        with col_btn:
-            # Padding để nút bấm thẳng hàng với ô input
+        c_in, c_btn = st.columns([3, 1])
+        with c_in:
+            ticker_input = st.text_input("Mã cổ phiếu:", "HPG", placeholder="Ví dụ: VNM").upper()
+        with c_btn:
             st.write("") 
             st.write("")
-            submit_button = st.form_submit_button(label='🔍 Phân Tích')
+            submit_button = st.form_submit_button(label='🔍 PHÂN TÍCH')
 
-# Nút đổi giao diện (Mẹo)
-st.sidebar.markdown("### ⚙️ Cài đặt")
-st.sidebar.info("Để chuyển chế độ Sáng/Tối, vui lòng chọn **Settings** ở góc trên cùng bên phải màn hình (Dấu 3 chấm ⋮).")
-
-# LOGIC KHI ẤN ENTER HOẶC NÚT BẤM
+# LOGIC KHI SUBMIT
 if submit_button:
     try:
-        ticker = ticker_input.upper().strip()
+        ticker = ticker_input.strip()
         symbol = ticker if ".VN" in ticker else f"{ticker}.VN"
         
-        with st.spinner(f'Đang phân tích mã {ticker}...'):
+        with st.spinner(f'Đang tải dữ liệu {ticker}...'):
             data = yf.download(symbol, period="1y", interval="1d", progress=False)
             
             if data.empty:
-                st.error(f"❌ Không tìm thấy dữ liệu cho mã **{ticker}**! Vui lòng kiểm tra lại.")
+                st.error(f"❌ Không tìm thấy mã **{ticker}**!")
             else:
                 if isinstance(data.columns, pd.MultiIndex): data.columns = data.columns.get_level_values(0)
                 
                 df = calculate_indicators(data)
                 rec, reason, color, report = analyze_strategy(df)
                 curr = df.iloc[-1]
+                prev = df.iloc[-2]
                 
-                # --- HIỂN THỊ KẾT QUẢ ---
-                st.divider()
-                
-                # Header Kết quả
-                st.markdown(f"### 📊 Kết quả phân tích: {ticker}")
-                
-                # Alert Box màu sắc
+                # --- PHẦN 1: KẾT LUẬN (ALERT) ---
+                st.write("") # Spacer
                 if color == 'green': st.success(f"## {rec}")
                 elif color == 'red': st.error(f"## {rec}")
                 elif color == 'orange': st.warning(f"## {rec}")
                 else: st.info(f"## {rec}")
                 
-                st.write(f"**Lý do:** {reason}")
+                st.markdown(f"**💡 Lý do:** {reason}")
                 
-                # Báo cáo chi tiết (HTML Render)
+                # --- PHẦN 2: BÁO CÁO CHI TIẾT ---
                 st.markdown(report, unsafe_allow_html=True)
-
-                # Metrics (Chỉ số)
-                m1, m2, m3, m4 = st.columns(4)
-                m1.metric("Giá đóng cửa", f"{curr['Close']:,.0f}", f"{curr['Close'] - df.iloc[-2]['Close']:,.0f}")
-                m2.metric("RSI (14)", f"{curr['RSI']:.1f}")
-                m3.metric("ADX (14)", f"{curr['ADX']:.1f}")
-                m4.metric("Xu hướng", "TĂNG" if curr['+DI'] > curr['-DI'] else "GIẢM")
                 
-                # --- BIỂU ĐỒ ---
+                st.markdown("<br>", unsafe_allow_html=True) # Khoảng cách lớn
+                
+                # --- PHẦN 3: CÁC CHỈ SỐ KỸ THUẬT (ĐÓNG KHUNG) ---
+                st.markdown("### 🔢 Các Chỉ Số Kỹ Thuật (Phiên Hiện Tại)")
+                
+                # Sử dụng Container có viền (Streamlit mới hỗ trợ border)
+                with st.container(border=True):
+                    m1, m2, m3, m4 = st.columns(4)
+                    
+                    # 1. Giá
+                    price_delta = curr['Close'] - prev['Close']
+                    with m1:
+                        render_metric_card("Giá Đóng Cửa", f"{curr['Close']:,.0f}", price_delta)
+                    
+                    # 2. RSI (Có so sánh)
+                    rsi_delta = curr['RSI'] - prev['RSI']
+                    with m2:
+                        render_metric_card("RSI (14)", f"{curr['RSI']:.1f}", rsi_delta)
+                    
+                    # 3. ADX (Có so sánh)
+                    adx_delta = curr['ADX'] - prev['ADX']
+                    with m3:
+                        render_metric_card("ADX (14)", f"{curr['ADX']:.1f}", adx_delta)
+                    
+                    # 4. Xu hướng (Màu sắc)
+                    trend_txt = "TĂNG" if curr['+DI'] > curr['-DI'] else "GIẢM"
+                    trend_bg = "#4CAF50" if trend_txt == "TĂNG" else "#FF5252"
+                    with m4:
+                        render_metric_card("Xu Hướng Chính", trend_txt, None, color=trend_bg)
+
+                # --- PHẦN 4: BIỂU ĐỒ ---
+                st.markdown("<br>", unsafe_allow_html=True)
                 st.divider()
+                st.markdown(f"### 📉 Biểu Đồ Kỹ Thuật: {ticker}")
+                
+                # Cấu hình biểu đồ tối ưu cho Dark Mode
                 fig = make_subplots(rows=3, cols=1, shared_xaxes=True, row_heights=[0.5, 0.25, 0.25], vertical_spacing=0.03,
                                    subplot_titles=("Giá & Bollinger Bands", "RSI (14)", "ADX & DI"))
                 
                 # Chart 1
                 fig.add_trace(go.Candlestick(x=df.index, open=df['Open'], high=df['High'], low=df['Low'], close=df['Close'], name="Giá"), row=1, col=1)
-                fig.add_trace(go.Scatter(x=df.index, y=df['Upper'], line=dict(color='gray', width=1, dash='dash'), name="Upper"), row=1, col=1)
-                fig.add_trace(go.Scatter(x=df.index, y=df['Lower'], line=dict(color='gray', width=1, dash='dash'), name="Lower"), row=1, col=1)
-                fig.add_trace(go.Scatter(x=df.index, y=df['SMA20'], line=dict(color='orange', width=1), name="SMA20"), row=1, col=1)
+                fig.add_trace(go.Scatter(x=df.index, y=df['Upper'], line=dict(color='rgba(200,200,200,0.5)', width=1, dash='dash'), name="Upper"), row=1, col=1)
+                fig.add_trace(go.Scatter(x=df.index, y=df['Lower'], line=dict(color='rgba(200,200,200,0.5)', width=1, dash='dash'), name="Lower"), row=1, col=1)
+                fig.add_trace(go.Scatter(x=df.index, y=df['SMA20'], line=dict(color='#FF914D', width=1), name="SMA20"), row=1, col=1)
 
                 # Chart 2
-                fig.add_trace(go.Scatter(x=df.index, y=df['RSI'], line=dict(color='#9467bd', width=2), name="RSI"), row=2, col=1)
-                fig.add_hline(y=70, line_dash="dot", row=2, col=1, line_color="red")
-                fig.add_hline(y=30, line_dash="dot", row=2, col=1, line_color="green")
+                fig.add_trace(go.Scatter(x=df.index, y=df['RSI'], line=dict(color='#E040FB', width=2), name="RSI"), row=2, col=1)
+                fig.add_hline(y=70, line_dash="dot", row=2, col=1, line_color="#FF5252")
+                fig.add_hline(y=30, line_dash="dot", row=2, col=1, line_color="#4CAF50")
                 
                 # Chart 3
-                fig.add_trace(go.Scatter(x=df.index, y=df['ADX'], line=dict(color='black', width=2), name="ADX"), row=3, col=1)
-                fig.add_trace(go.Scatter(x=df.index, y=df['+DI'], line=dict(color='#2ca02c', width=1), name="+DI"), row=3, col=1)
-                fig.add_trace(go.Scatter(x=df.index, y=df['-DI'], line=dict(color='#d62728', width=1), name="-DI"), row=3, col=1)
+                fig.add_trace(go.Scatter(x=df.index, y=df['ADX'], line=dict(color='white', width=2), name="ADX"), row=3, col=1)
+                fig.add_trace(go.Scatter(x=df.index, y=df['+DI'], line=dict(color='#4CAF50', width=1), name="+DI"), row=3, col=1)
+                fig.add_trace(go.Scatter(x=df.index, y=df['-DI'], line=dict(color='#FF5252', width=1), name="-DI"), row=3, col=1)
                 fig.add_hline(y=25, line_dash="dot", row=3, col=1, line_color="gray")
-                fig.add_hline(y=50, line_dash="dot", row=3, col=1, line_color="red")
+                fig.add_hline(y=50, line_dash="dot", row=3, col=1, line_color="#FF5252")
                 
-                fig.update_layout(height=800, xaxis_rangeslider_visible=False, margin=dict(l=20, r=20, t=40, b=20))
+                # Layout Chart Dark Mode
+                fig.update_layout(height=900, xaxis_rangeslider_visible=False, 
+                                  paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', # Nền trong suốt để ăn theo theme
+                                  font=dict(color='#FAFAFA'),
+                                  margin=dict(l=20, r=20, t=40, b=20))
+                fig.update_xaxes(showgrid=True, gridwidth=1, gridcolor='#333')
+                fig.update_yaxes(showgrid=True, gridwidth=1, gridcolor='#333')
+                
                 st.plotly_chart(fig, use_container_width=True)
 
     except Exception as e:
@@ -261,4 +359,4 @@ if submit_button:
 
 # Footer
 st.markdown("---")
-st.markdown("<p style='text-align: center; color: gray; font-size: 0.8em;'>⚠️ Công cụ hỗ trợ phân tích kỹ thuật. Không phải lời khuyên đầu tư tài chính.</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center; color: #666; font-size: 0.8em;'>⚠️ Công cụ hỗ trợ phân tích kỹ thuật. Dữ liệu từ Yahoo Finance.</p>", unsafe_allow_html=True)
