@@ -1,1 +1,1 @@
-streamlityfinancepandasnumpyplotly
+streamlit yfinance pandas numpy plotly
