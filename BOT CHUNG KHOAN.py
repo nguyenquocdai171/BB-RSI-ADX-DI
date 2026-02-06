@@ -73,15 +73,16 @@ st.markdown("""
     div.stButton > button { width: 100%; border-radius: 8px; font-weight: bold; height: 50px; font-size: 1.1rem; }
     
     /* FIX CĂN CHỈNH FORM */
+    /* Căn giữa ô checkbox vào giữa cột */
     div[data-testid="stCheckbox"] {
         display: flex;
+        justify-content: center; 
         align-items: center;
-        justify-content: center;
-        height: 50px; /* Khớp chiều cao input */
-        padding-bottom: 5px;
+        width: 100%;
     }
+    /* Phóng to vừa phải */
     div[data-testid="stCheckbox"] label span {
-        transform: scale(1.8); 
+        transform: scale(1.5); 
     }
     
     /* BACKTEST RESULT BOX */
@@ -130,21 +131,29 @@ def calculate_indicators(df):
     df['ADX'] = df['DX'].ewm(alpha=1/14, adjust=False).mean()
     return df
 
-# --- HÀM VẼ GIAO DIỆN CHỈ SỐ (ĐÃ FIX LỖI HTML TRIỆT ĐỂ) ---
+# --- HÀM VẼ GIAO DIỆN CHỈ SỐ (ĐÃ FIX LỖI HTML) ---
 def render_metric_card(label, value, delta=None, color=None):
     delta_html = ""
     if delta is not None:
         delta_color = "#00E676" if delta > 0 else ("#FF5252" if delta < 0 else "#888")
         arrow = "▲" if delta > 0 else ("▼" if delta < 0 else "")
-        delta_html = f"<div style='font-size:0.9rem; margin-top:5px; color:{delta_color}'>{arrow} {abs(delta):.1f} vs phiên trước</div>"
+        delta_val = f"{abs(delta):.1f}"
+        delta_html = f"<div style='font-size:0.9rem; margin-top:5px; color:{delta_color}'>{arrow} {delta_val} vs phiên trước</div>"
     
     if color:
         value_html = f"<div class='trend-badge' style='background-color:{color}'>{value}</div>"
     else:
         value_html = f"<div class='metric-value'>{value}</div>"
 
-    # Xóa indent để tránh lỗi markdown parser
-    card_html = f"<div class='metric-container'><div class='metric-label'>{label}</div><div class='metric-value-box'>{value_html}{delta_html}</div></div>"
+    card_html = f"""
+    <div class='metric-container'>
+        <div class='metric-label'>{label}</div>
+        <div class='metric-value-box'>
+            {value_html}
+            {delta_html}
+        </div>
+    </div>
+    """
     st.markdown(card_html, unsafe_allow_html=True)
 
 # --- LOGIC CHIẾN LƯỢC ---
@@ -280,14 +289,15 @@ st.markdown("""
 col1, col2, col3 = st.columns([1, 2, 1]) 
 with col2:
     with st.form(key='search_form'):
-        # Căn chỉnh vertical_alignment="bottom" để các ô nhập liệu thẳng hàng đáy
-        c_ticker, c_cb, c_val = st.columns([2, 0.5, 0.8], vertical_alignment="bottom")
+        # vertical_alignment='bottom' để căn đáy các widget cho thẳng hàng
+        c_ticker, c_cb, c_val = st.columns([2, 0.6, 0.8], vertical_alignment="bottom")
         
         with c_ticker:
             ticker_input = st.text_input("Mã cổ phiếu:", value="", placeholder="VD: HPG, VNM...").upper()
             
         with c_cb:
-            st.markdown('<p style="font-size:0.9rem; font-weight:600; text-align:center; margin-bottom:5px;">Bật SL</p>', unsafe_allow_html=True)
+            # Nhãn giả cho Checkbox để nó có header giống 2 ô kia
+            st.markdown('<p style="font-size:0.8rem; font-weight:600; text-align:center; margin-bottom:5px;">Bật SL</p>', unsafe_allow_html=True)
             use_sl = st.checkbox("use_sl_hidden", value=True, label_visibility="collapsed")
             
         with c_val:
