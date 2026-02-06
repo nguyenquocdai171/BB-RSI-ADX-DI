@@ -5,7 +5,7 @@ import numpy as np
 import plotly.graph_objects as go
 import streamlit.components.v1 as components
 import random
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 # --- CẤU HÌNH TRANG WEB ---
 st.set_page_config(layout="wide", page_title="Stock Advisor PRO", page_icon="📈")
@@ -29,17 +29,18 @@ st.markdown("""
         font-weight: 400; margin-bottom: 20px; letter-spacing: 0.5px;
     }
 
-    /* DISCLAIMER (CĂN GIỮA ĐẸP) */
+    /* DISCLAIMER */
     .disclaimer-box {
         background-color: #1E1E1E; border: 1px solid #444; border-radius: 8px;
         padding: 20px; margin: 0 auto 30px auto; text-align: center; max-width: 800px;
         box-shadow: 0 4px 6px rgba(0,0,0,0.3);
     }
     .disclaimer-title { color: #FF5252; font-weight: bold; font-size: 1rem; text-transform: uppercase; margin-bottom: 12px; letter-spacing: 1px; }
-    .d-line { color: #AAA; font-size: 0.95rem; margin-bottom: 6px; display: block; }
-    .highlight { color: #E0E0E0; font-weight: 700; text-decoration: underline; }
+    .d-line-1 { color: #AAA; font-size: 0.95rem; margin-bottom: 5px; }
+    .d-line-2 { color: #E0E0E0; font-size: 1rem; font-weight: bold; margin-bottom: 5px; text-decoration: underline; text-decoration-color: #555; }
+    .d-line-3 { color: #888; font-size: 0.85rem; font-style: italic; }
 
-    /* RESULT CARD */
+    /* RESULT & REPORT */
     .result-card {
         padding: 20px; border-radius: 12px; text-align: center; margin-bottom: 20px;
         border: 1px solid rgba(255,255,255,0.1); box-shadow: 0 4px 15px rgba(0,0,0,0.3);
@@ -51,13 +52,12 @@ st.markdown("""
     .result-title { font-size: 2.2rem; font-weight: 800; color: white; margin: 0; text-shadow: 0 2px 4px rgba(0,0,0,0.5); }
     .result-reason { font-size: 1.1rem; color: #EEE; margin-top: 10px; font-style: italic; }
 
-    /* REPORT BOX */
     .report-box { background-color: #1E1E1E; border: 1px solid #444; border-radius: 12px; padding: 25px; margin-top: 10px; }
     .report-header { color: #00E676; font-size: 1.2rem; font-weight: bold; margin-bottom: 15px; border-bottom: 1px solid #444; padding-bottom: 10px; text-transform: uppercase; }
     .report-item { margin-bottom: 12px; font-size: 1rem; color: #FAFAFA; display: flex; align-items: center; }
     .icon-dot { margin-right: 12px; font-size: 1.2rem; }
 
-    /* METRIC CARDS */
+    /* METRICS */
     .metric-container {
         background-color: #262730; border: 1px solid #41424C; border-radius: 12px;
         padding: 15px 10px; text-align: center; height: 160px;
@@ -71,7 +71,7 @@ st.markdown("""
     
     div.stButton > button { width: 100%; border-radius: 8px; font-weight: bold; height: 50px; font-size: 1.1rem; }
     
-    /* CUSTOM RADIO BUTTONS CHO TIME RANGE */
+    /* RADIO BUTTONS HORIZONTAL */
     div[data-testid="stRadio"] > label { display: none; }
     div[role="radiogroup"] { flex-direction: row; justify-content: center; }
 </style>
@@ -114,7 +114,7 @@ def calculate_indicators(df):
 # --- LOGIC MUA BÁN ---
 def analyze_strategy(df):
     if len(df) < 25: return "Không đủ dữ liệu", "NEUTRAL", "gray", "Chưa đủ dữ liệu."
-    curr = df.iloc[-1]; prev = df.iloc[-2]
+    curr = df.iloc[-1]; prev = df.iloc[-2]; prev2 = df.iloc[-3]
     price = curr['Close']; rsi = curr['RSI']; adx = curr['ADX']
     di_plus = curr['+DI']; di_minus = curr['-DI']
     lower_band = curr['Lower']; upper_band = curr['Upper']
@@ -177,13 +177,13 @@ def render_metric_card(label, value, delta=None, color=None):
 st.markdown("<h1 class='main-title'>STOCK ADVISOR PRO</h1>", unsafe_allow_html=True)
 st.markdown("<p class='sub-title'>Hệ thống Hỗ trợ Phân tích & Quản trị Rủi ro Đầu tư</p>", unsafe_allow_html=True)
 
-# DISCLAIMER (CĂN GIỮA VÀ TÁCH DÒNG)
+# DISCLAIMER
 st.markdown("""
 <div class='disclaimer-box'>
     <div class='disclaimer-title'>⚠️ TUYÊN BỐ MIỄN TRỪ TRÁCH NHIỆM</div>
-    <span class='d-line'>Công cụ sử dụng thuật toán kỹ thuật (BB, RSI, ADX) để hỗ trợ tham khảo.</span>
-    <span class='d-line'><span class='highlight'>KHÔNG</span> phải lời khuyên đầu tư tài chính chính thức.</span>
-    <span class='d-line'>Người dùng tự chịu trách nhiệm. Dữ liệu Yahoo Finance (Trễ 15p).</span>
+    <div class='d-line-1'>Công cụ sử dụng thuật toán kỹ thuật (BB, RSI, ADX) để hỗ trợ tham khảo.</div>
+    <div class='d-line-2'>KHÔNG phải lời khuyên đầu tư tài chính chính thức.</div>
+    <div class='d-line-3'>Người dùng tự chịu trách nhiệm. Dữ liệu Yahoo Finance (Trễ 15p).</div>
 </div>
 """, unsafe_allow_html=True)
 
@@ -227,7 +227,6 @@ if submit_button or 'data' in st.session_state:
                     df_intra = yf.download(symbol, period="1d", interval="5m", progress=False)
                     if isinstance(df_intra.columns, pd.MultiIndex): df_intra.columns = df_intra.columns.get_level_values(0)
                     
-                    # Chỉnh múi giờ Intraday về Việt Nam
                     if not df_intra.empty:
                         if df_intra.index.tzinfo is None:
                             df_intra.index = df_intra.index + timedelta(hours=7)
@@ -248,29 +247,35 @@ if submit_button or 'data' in st.session_state:
         st.markdown(report, unsafe_allow_html=True)
         st.markdown("<br>", unsafe_allow_html=True)
         
-        # --- BIỂU ĐỒ INTRADAY (FIXED) ---
+        # --- BIỂU ĐỒ INTRADAY (ĐÃ SỬA MÀU & THAM CHIẾU) ---
         if not df_intra.empty:
             st.divider()
             latest_date = df_intra.index[0].strftime('%d/%m/%Y')
             st.markdown(f"### ⏱️ Diễn biến giá trong ngày ({latest_date}) - {ticker}")
             
+            # Lấy giá đóng cửa ngày hôm trước làm THAM CHIẾU
+            ref_price = df['Close'].iloc[-2] 
+            
+            # Xác định màu: Xanh nếu giá hiện tại > tham chiếu, Đỏ nếu < tham chiếu
+            current_price = df_intra['Close'].iloc[-1]
+            line_color = '#00E676' if current_price >= ref_price else '#FF5252'
+
             fig_intra = go.Figure()
-            # QUAN TRỌNG: Không dùng fill='tozeroy' để tránh bẹt biểu đồ
             fig_intra.add_trace(go.Scatter(
                 x=df_intra.index, y=df_intra['Close'], 
                 mode='lines',
-                line=dict(color='#00E676', width=2),
+                line=dict(color=line_color, width=2),
                 name='Giá Intraday'
             ))
-            open_price = df_intra['Open'].iloc[0]
-            fig_intra.add_hline(y=open_price, line_dash="dash", line_color="gray", annotation_text="Tham chiếu/Mở cửa")
+            # Vẽ đường tham chiếu (Previous Close)
+            fig_intra.add_hline(y=ref_price, line_dash="dash", line_color="gray", annotation_text="Tham chiếu (Hôm qua)")
 
             fig_intra.update_layout(
                 height=350, xaxis_rangeslider_visible=False,
                 paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
                 font=dict(color='#FAFAFA'), margin=dict(l=10, r=10, t=10, b=10),
                 xaxis=dict(showgrid=True, gridwidth=1, gridcolor='#333', tickformat="%H:%M"),
-                yaxis=dict(showgrid=True, gridwidth=1, gridcolor='#333', autorange=True) 
+                yaxis=dict(showgrid=True, gridwidth=1, gridcolor='#333', autorange=True)
             )
             st.plotly_chart(fig_intra, use_container_width=True, config={'scrollZoom': False, 'displayModeBar': False})
         else:
@@ -287,6 +292,7 @@ if submit_button or 'data' in st.session_state:
         st.markdown("<br>", unsafe_allow_html=True)
         st.divider()
         
+        # --- BIỂU ĐỒ KỸ THUẬT (ĐỒNG BỘ ZOOM) ---
         st.markdown(f"### 📊 Biểu đồ Kỹ Thuật ({ticker})")
         time_tabs = st.radio("Chọn khung thời gian:", 
                              ["1 Tháng", "3 Tháng", "6 Tháng", "1 Năm", "3 Năm", "Tất cả"], 
@@ -299,6 +305,7 @@ if submit_button or 'data' in st.session_state:
         elif time_tabs == "1 Năm": df_chart = df.iloc[-252:]
         elif time_tabs == "3 Năm": df_chart = df.iloc[-756:]
 
+        # CHART 1: GIÁ
         fig1 = go.Figure()
         fig1.add_trace(go.Scatter(x=df_chart.index, y=df_chart['Upper'], line=dict(color='rgba(255,255,255,0.5)', width=1, dash='dash'), name="Upper Band"))
         fig1.add_trace(go.Scatter(x=df_chart.index, y=df_chart['Lower'], line=dict(color='rgba(255,255,255,0.5)', width=1, dash='dash'), name="Lower Band"))
@@ -315,6 +322,8 @@ if submit_button or 'data' in st.session_state:
         st.plotly_chart(fig1, use_container_width=True, config={'scrollZoom': False, 'displayModeBar': False})
 
         col_c1, col_c2 = st.columns(2)
+        
+        # CHART 2: RSI (ĐÃ ĐỒNG BỘ DATA)
         with col_c1:
             st.markdown("### 🚀 Chỉ số RSI")
             fig2 = go.Figure()
@@ -328,6 +337,7 @@ if submit_button or 'data' in st.session_state:
                               yaxis=dict(showgrid=True, gridwidth=1, gridcolor='#333'))
             st.plotly_chart(fig2, use_container_width=True, config={'scrollZoom': False})
 
+        # CHART 3: ADX (ĐÃ ĐỒNG BỘ DATA)
         with col_c2:
             st.markdown("### ⚖️ Chỉ số ADX & DI")
             fig3 = go.Figure()
@@ -341,3 +351,6 @@ if submit_button or 'data' in st.session_state:
                               xaxis=dict(showgrid=True, gridwidth=1, gridcolor='#333'),
                               yaxis=dict(showgrid=True, gridwidth=1, gridcolor='#333'))
             st.plotly_chart(fig3, use_container_width=True, config={'scrollZoom': False})
+
+            except Exception as e:
+                st.error(f"Đã xảy ra lỗi hệ thống: {e}")
