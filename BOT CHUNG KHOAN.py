@@ -72,19 +72,6 @@ st.markdown("""
     
     div.stButton > button { width: 100%; border-radius: 8px; font-weight: bold; height: 50px; font-size: 1.1rem; }
     
-    /* FIX CĂN CHỈNH FORM */
-    /* Căn giữa ô checkbox vào giữa cột */
-    div[data-testid="stCheckbox"] {
-        display: flex;
-        justify-content: center; 
-        align-items: center;
-        width: 100%;
-    }
-    /* Phóng to vừa phải */
-    div[data-testid="stCheckbox"] label span {
-        transform: scale(1.5); 
-    }
-    
     /* BACKTEST RESULT BOX */
     .backtest-box {
         background: linear-gradient(135deg, #263238 0%, #37474F 100%);
@@ -131,7 +118,7 @@ def calculate_indicators(df):
     df['ADX'] = df['DX'].ewm(alpha=1/14, adjust=False).mean()
     return df
 
-# --- HÀM VẼ GIAO DIỆN CHỈ SỐ (ĐÃ FIX LỖI HTML) ---
+# --- HÀM VẼ GIAO DIỆN CHỈ SỐ (FIXED </div> ERROR) ---
 def render_metric_card(label, value, delta=None, color=None):
     delta_html = ""
     if delta is not None:
@@ -145,15 +132,8 @@ def render_metric_card(label, value, delta=None, color=None):
     else:
         value_html = f"<div class='metric-value'>{value}</div>"
 
-    card_html = f"""
-    <div class='metric-container'>
-        <div class='metric-label'>{label}</div>
-        <div class='metric-value-box'>
-            {value_html}
-            {delta_html}
-        </div>
-    </div>
-    """
+    # Viết thành 1 dòng string duy nhất để tránh lỗi parser
+    card_html = f"<div class='metric-container'><div class='metric-label'>{label}</div><div class='metric-value-box'>{value_html}{delta_html}</div></div>"
     st.markdown(card_html, unsafe_allow_html=True)
 
 # --- LOGIC CHIẾN LƯỢC ---
@@ -223,12 +203,15 @@ def analyze_current_market(df):
     return rec, reason, color_class, report
 
 # --- HÀM BACKTEST ---
-def run_simulation(df, stop_loss_pct, use_sl):
+def run_simulation(df, stop_loss_pct):
     initial_capital = 100_000_000
     cash = initial_capital
     shares = 0
     position = False
     entry_price = 0
+    
+    # 0 = Tắt
+    use_sl = stop_loss_pct > 0
     
     for i in range(50, len(df)):
         curr = df.iloc[i]
@@ -289,19 +272,14 @@ st.markdown("""
 col1, col2, col3 = st.columns([1, 2, 1]) 
 with col2:
     with st.form(key='search_form'):
-        # vertical_alignment='bottom' để căn đáy các widget cho thẳng hàng
-        c_ticker, c_cb, c_val = st.columns([2, 0.6, 0.8], vertical_alignment="bottom")
+        # Quay về giao diện 2 cột đơn giản, dễ nhìn, không lệch
+        c_ticker, c_sl = st.columns([2, 1])
         
         with c_ticker:
             ticker_input = st.text_input("Mã cổ phiếu:", value="", placeholder="VD: HPG, VNM...").upper()
             
-        with c_cb:
-            # Nhãn giả cho Checkbox để nó có header giống 2 ô kia
-            st.markdown('<p style="font-size:0.8rem; font-weight:600; text-align:center; margin-bottom:5px;">Bật SL</p>', unsafe_allow_html=True)
-            use_sl = st.checkbox("use_sl_hidden", value=True, label_visibility="collapsed")
-            
-        with c_val:
-            stop_loss_input = st.number_input("Mức %:", min_value=0.5, max_value=20.0, value=7.0, step=0.5, disabled=not use_sl)
+        with c_sl:
+            stop_loss_input = st.number_input("Cắt lỗ % (0 = Tắt):", min_value=0.0, max_value=20.0, value=7.0, step=0.5)
             
         submit_button = st.form_submit_button(label='🚀 PHÂN TÍCH & BACKTEST', use_container_width=True)
 
@@ -313,11 +291,9 @@ if submit_button or 'data' in st.session_state:
         ticker = ticker_input.strip()
         st.session_state['ticker'] = ticker
         st.session_state['sl_pct'] = stop_loss_input
-        st.session_state['use_sl'] = use_sl
     elif 'ticker' in st.session_state:
         ticker = st.session_state['ticker']
         stop_loss_input = st.session_state.get('sl_pct', 7.0)
-        use_sl = st.session_state.get('use_sl', True)
 
     if not ticker:
         st.warning("⚠️ Vui lòng nhập mã cổ phiếu!")
@@ -360,9 +336,9 @@ if submit_button or 'data' in st.session_state:
             st.markdown(f"<div class='result-card {bg_class}'><div class='result-title'>{rec}</div><div class='result-reason'>💡 Lý do: {reason}</div></div>", unsafe_allow_html=True)
             
             # BACKTEST RESULT
-            total_return, avg_return = run_simulation(df, stop_loss_input, use_sl)
+            total_return, avg_return = run_simulation(df, stop_loss_input)
             bk_color = "#00E676" if avg_return > 0 else "#FF5252"
-            sl_text = f"Stoploss {stop_loss_input}%" if use_sl else "KHÔNG Cắt Lỗ"
+            sl_text = f"Stoploss {stop_loss_input}%" if stop_loss_input > 0 else "KHÔNG Cắt Lỗ"
             
             st.markdown(f"""
             <div class='backtest-box'>
