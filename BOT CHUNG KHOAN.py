@@ -57,6 +57,7 @@ st.markdown("""
     .report-item { margin-bottom: 12px; font-size: 1rem; color: #FAFAFA; display: flex; align-items: center; }
     .icon-dot { margin-right: 12px; font-size: 1.2rem; }
 
+    /* METRIC CARDS */
     .metric-container {
         background-color: #262730; border: 1px solid #41424C; border-radius: 12px;
         padding: 15px 10px; text-align: center; height: 160px;
@@ -119,19 +120,23 @@ def calculate_indicators(df):
     df['ADX'] = df['DX'].ewm(alpha=1/14, adjust=False).mean()
     return df
 
-# --- HÀM VẼ GIAO DIỆN CHỈ SỐ (ĐÃ THÊM LẠI) ---
+# --- HÀM VẼ GIAO DIỆN CHỈ SỐ (ĐÃ SỬA LỖI DIV) ---
 def render_metric_card(label, value, delta=None, color=None):
+    # Xây dựng nội dung HTML một cách rõ ràng, tránh lỗi format chuỗi
     delta_html = ""
     if delta is not None:
         delta_color = "#00E676" if delta > 0 else ("#FF5252" if delta < 0 else "#888")
         arrow = "▲" if delta > 0 else ("▼" if delta < 0 else "")
-        delta_html = f"<div style='font-size:0.9rem; margin-top:5px; color:{delta_color}'>{arrow} {abs(delta):.1f} vs phiên trước</div>"
+        delta_val = f"{abs(delta):.1f}"
+        delta_html = f"<div style='font-size:0.9rem; margin-top:5px; color:{delta_color}'>{arrow} {delta_val} vs phiên trước</div>"
     
-    value_html = f"<div class='metric-value'>{value}</div>"
-    if color: 
+    if color:
         value_html = f"<div class='trend-badge' style='background-color:{color}'>{value}</div>"
+    else:
+        value_html = f"<div class='metric-value'>{value}</div>"
 
-    st.markdown(f"""
+    # Kết hợp thành chuỗi HTML hoàn chỉnh
+    card_html = f"""
     <div class='metric-container'>
         <div class='metric-label'>{label}</div>
         <div class='metric-value-box'>
@@ -139,36 +144,35 @@ def render_metric_card(label, value, delta=None, color=None):
             {delta_html}
         </div>
     </div>
-    """, unsafe_allow_html=True)
+    """
+    st.markdown(card_html, unsafe_allow_html=True)
 
-# --- LOGIC CHIẾN LƯỢC CHUẨN ---
+# --- LOGIC CHIẾN LƯỢC ---
 def check_signals(curr, prev, prev2):
     price = curr['Close']; rsi = curr['RSI']; adx = curr['ADX']
     lower_band = curr['Lower']; upper_band = curr['Upper']
     
-    # 1. MUA
     buy_trigger = (price <= lower_band * 1.01) and (rsi < 30)
     if buy_trigger:
         if adx < 25:
             if (curr['-DI'] > curr['+DI']) and (curr['-DI'] < prev['-DI']): return 1 
         elif adx > 50:
             if (curr['ADX'] < prev['ADX'] < prev2['ADX']) and (curr['-DI'] < prev['-DI'] < prev2['-DI']): return 1
-        else: # 25-50
+        else: 
             if (curr['-DI'] > curr['+DI']) and (curr['-DI'] < prev['-DI']): return 1
             
-    # 2. BÁN
     sell_trigger = (price >= upper_band * 0.99) and (rsi > 70)
     if sell_trigger:
         if adx < 25:
             if (curr['+DI'] > curr['-DI']) and (curr['+DI'] < prev['+DI']): return -1
         elif adx > 50:
             if (curr['ADX'] < prev['ADX'] < prev2['ADX']) and (curr['+DI'] < prev['+DI'] < prev2['+DI']): return -1
-        else: # 25-50
+        else:
             if (curr['+DI'] > curr['-DI']) and (curr['+DI'] < prev['+DI']): return -1
             
     return 0
 
-# --- HÀM PHÂN TÍCH HIỆN TẠI ---
+# --- HÀM PHÂN TÍCH ---
 def analyze_current_market(df):
     if len(df) < 25: return "Không đủ dữ liệu", "NEUTRAL", "gray", "Chưa đủ dữ liệu."
     curr = df.iloc[-1]; prev = df.iloc[-2]; prev2 = df.iloc[-3]
@@ -186,7 +190,6 @@ def analyze_current_market(df):
         reason = "Giá chạm đỉnh BB, RSI cao. Các chỉ báo ADX/DI cho tín hiệu đảo chiều giảm."
         color_class = "bg-red"
 
-    # Report text
     trend_state = "TĂNG" if curr['+DI'] > curr['-DI'] else "GIẢM"
     trend_strength = "YẾU (Sideway)" if curr['ADX'] < 25 else ("CỰC MẠNH" if curr['ADX'] > 50 else "TRUNG BÌNH")
     trend_color = "#00E676" if curr['+DI'] > curr['-DI'] else "#FF5252" 
@@ -210,8 +213,8 @@ def analyze_current_market(df):
     """
     return rec, reason, color_class, report
 
-# --- HÀM BACKTEST ---
-def run_simulation(df, stop_loss_pct):
+# --- HÀM BACKTEST (CHẠY NGẦM) ---
+def run_simulation(df, stop_loss_pct, use_sl):
     initial_capital = 100_000_000
     cash = initial_capital
     shares = 0
@@ -224,10 +227,9 @@ def run_simulation(df, stop_loss_pct):
         prev2 = df.iloc[i-2]
         price = curr['Close']
         
-        # 1. Xử lý vị thế đang có
         if position:
-            # STOP LOSS (Nếu stop_loss_pct > 0 thì mới kích hoạt)
-            if stop_loss_pct > 0:
+            # STOP LOSS (Nếu được bật)
+            if use_sl:
                 pct_change = (price - entry_price) / entry_price
                 if pct_change <= -(stop_loss_pct / 100.0):
                     cash += shares * price * (1 - 0.0015)
@@ -243,7 +245,6 @@ def run_simulation(df, stop_loss_pct):
                 position = False
                 continue
         
-        # 2. Xử lý mua mới
         if not position:
             signal = check_signals(curr, prev, prev2)
             if signal == 1:
@@ -281,12 +282,14 @@ st.markdown("""
 col1, col2, col3 = st.columns([1, 2, 1]) 
 with col2:
     with st.form(key='search_form'):
-        c_input, c_sl = st.columns([2, 1])
+        c_input, c_sl = st.columns([1.5, 1])
         with c_input:
             ticker_input = st.text_input("Mã cổ phiếu:", value="", placeholder="VD: HPG, VNM...").upper()
         with c_sl:
-            # Cho phép nhập 0 để tắt cắt lỗ
-            stop_loss_input = st.number_input("Cắt lỗ % (0 để Tắt):", min_value=0.0, max_value=20.0, value=7.0, step=0.5)
+            # Checkbox để Bật/Tắt Cắt lỗ
+            use_sl = st.checkbox("Bật Cắt lỗ", value=True)
+            # Nếu bật thì hiện ô nhập số, nếu tắt thì disable
+            stop_loss_input = st.number_input("Mức %:", min_value=1.0, max_value=20.0, value=7.0, step=0.5, disabled=not use_sl)
             
         submit_button = st.form_submit_button(label='🚀 PHÂN TÍCH & BACKTEST', use_container_width=True)
 
@@ -298,9 +301,11 @@ if submit_button or 'data' in st.session_state:
         ticker = ticker_input.strip()
         st.session_state['ticker'] = ticker
         st.session_state['sl_pct'] = stop_loss_input
+        st.session_state['use_sl'] = use_sl
     elif 'ticker' in st.session_state:
         ticker = st.session_state['ticker']
         stop_loss_input = st.session_state.get('sl_pct', 7.0)
+        use_sl = st.session_state.get('use_sl', True)
 
     if not ticker:
         st.warning("⚠️ Vui lòng nhập mã cổ phiếu!")
@@ -342,10 +347,10 @@ if submit_button or 'data' in st.session_state:
 
             st.markdown(f"<div class='result-card {bg_class}'><div class='result-title'>{rec}</div><div class='result-reason'>💡 Lý do: {reason}</div></div>", unsafe_allow_html=True)
             
-            # BACKTEST RESULT
-            total_return, avg_return = run_simulation(df, stop_loss_input)
+            # BACKTEST
+            total_return, avg_return = run_simulation(df, stop_loss_input, use_sl)
             bk_color = "#00E676" if avg_return > 0 else "#FF5252"
-            sl_text = f"Stoploss {stop_loss_input}%" if stop_loss_input > 0 else "KHÔNG Cắt Lỗ"
+            sl_text = f"Stoploss {stop_loss_input}%" if use_sl else "KHÔNG Cắt Lỗ"
             
             st.markdown(f"""
             <div class='backtest-box'>
@@ -392,19 +397,18 @@ if submit_button or 'data' in st.session_state:
             st.markdown("<br>", unsafe_allow_html=True)
             st.divider()
             
-            # --- BIỂU ĐỒ KỸ THUẬT (ĐỒNG BỘ) ---
+            # --- BIỂU ĐỒ KỸ THUẬT ---
             st.markdown(f"### 📊 Biểu đồ Kỹ Thuật ({ticker})")
             st.caption(f"ℹ️ Điều chỉnh khung thời gian bên dưới sẽ áp dụng cho cả Biểu đồ Giá, RSI và ADX:")
             time_tabs = st.radio("Chọn khung thời gian:", ["1 Tháng", "3 Tháng", "6 Tháng", "1 Năm", "3 Năm", "Tất cả"], horizontal=True, index=3)
             
-            # Logic cắt dữ liệu (Slicing) để đồng bộ cả 3 biểu đồ
+            # Filter Data
             df_chart = df.copy()
             if time_tabs == "1 Tháng": df_chart = df.iloc[-22:]
             elif time_tabs == "3 Tháng": df_chart = df.iloc[-66:]
             elif time_tabs == "6 Tháng": df_chart = df.iloc[-132:]
             elif time_tabs == "1 Năm": df_chart = df.iloc[-252:]
             elif time_tabs == "3 Năm": df_chart = df.iloc[-756:]
-            # "Tất cả" giữ nguyên df gốc
 
             fig1 = go.Figure()
             fig1.add_trace(go.Scatter(x=df_chart.index, y=df_chart['Upper'], line=dict(color='rgba(255,255,255,0.5)', width=1, dash='dash'), name="Upper Band"))
@@ -415,8 +419,6 @@ if submit_button or 'data' in st.session_state:
             st.plotly_chart(fig1, use_container_width=True, config={'scrollZoom': False, 'displayModeBar': False})
 
             col_c1, col_c2 = st.columns(2)
-            
-            # RSI Chart dùng df_chart để đồng bộ
             with col_c1:
                 st.markdown("### 🚀 Chỉ số RSI")
                 fig2 = go.Figure()
@@ -426,7 +428,6 @@ if submit_button or 'data' in st.session_state:
                 fig2.update_layout(height=350, xaxis_rangeslider_visible=False, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font=dict(color='#FAFAFA'), margin=dict(l=10, r=10, t=10, b=40), legend=dict(orientation="h", yanchor="top", y=-0.15, xanchor="center", x=0.5), xaxis=dict(showgrid=True, gridwidth=1, gridcolor='#333'), yaxis=dict(showgrid=True, gridwidth=1, gridcolor='#333', autorange=True))
                 st.plotly_chart(fig2, use_container_width=True, config={'scrollZoom': False})
 
-            # ADX Chart dùng df_chart để đồng bộ
             with col_c2:
                 st.markdown("### ⚖️ Chỉ số ADX & DI")
                 fig3 = go.Figure()
