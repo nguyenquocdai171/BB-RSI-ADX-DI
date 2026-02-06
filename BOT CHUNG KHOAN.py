@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 # --- CẤU HÌNH TRANG WEB ---
 st.set_page_config(layout="wide", page_title="Stock Advisor PRO", page_icon="📈")
 
-# --- CSS TÙY CHỈNH ---
+# --- CSS TÙY CHỈNH (ĐÃ CĂN CHỈNH FORM) ---
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700;900&display=swap');
@@ -57,7 +57,6 @@ st.markdown("""
     .report-item { margin-bottom: 12px; font-size: 1rem; color: #FAFAFA; display: flex; align-items: center; }
     .icon-dot { margin-right: 12px; font-size: 1.2rem; }
 
-    /* METRIC CARDS */
     .metric-container {
         background-color: #262730; border: 1px solid #41424C; border-radius: 12px;
         padding: 15px 10px; text-align: center; height: 160px;
@@ -71,13 +70,39 @@ st.markdown("""
     
     div.stButton > button { width: 100%; border-radius: 8px; font-weight: bold; height: 50px; font-size: 1.1rem; }
     
-    /* CĂN CHỈNH & PHÓNG TO CHECKBOX */
+    /* --- CĂN CHỈNH FORM NHẬP LIỆU (FIXED) --- */
+    
+    /* 1. Nhãn cho Input (Mã CP, Mức %) */
+    div[data-testid="stTextInput"] label, div[data-testid="stNumberInput"] label {
+        font-size: 0.9rem;
+        font-weight: 600;
+        margin-bottom: 0.5rem;
+    }
+
+    /* 2. Nhãn giả "Bật SL" */
+    .custom-label {
+        font-size: 0.9rem;
+        font-weight: 600;
+        margin-bottom: 0.5rem;
+        color: #FAFAFA; /* Màu giống label mặc định */
+        text-align: center;
+        display: block;
+    }
+
+    /* 3. Căn chỉnh ô Checkbox */
     div[data-testid="stCheckbox"] {
-        transform: scale(2.2); /* Phóng to checkbox lên 2.2 lần */
-        margin-top: 10px;      /* Căn chỉnh vị trí xuống dưới */
-        margin-left: 10px;     /* Đẩy sang phải chút cho cân giữa cột */
         display: flex;
-        align-items: center;
+        justify-content: center; /* Căn giữa ngang */
+        align-items: center;     /* Căn giữa dọc */
+        height: 48px;            /* Chiều cao khớp với ô Input bên cạnh */
+        border: 1px solid transparent; /* Giữ khung */
+        margin-top: -2px; /* Tinh chỉnh nhỏ để khớp dòng kẻ */
+    }
+
+    /* 4. Phóng to nút tick */
+    div[data-testid="stCheckbox"] label span {
+        transform: scale(1.8); /* Phóng to 1.8 lần là vừa đẹp */
+        background-color: transparent !important;
     }
     
     /* BACKTEST RESULT BOX */
@@ -126,13 +151,14 @@ def calculate_indicators(df):
     df['ADX'] = df['DX'].ewm(alpha=1/14, adjust=False).mean()
     return df
 
-# --- HÀM VẼ GIAO DIỆN CHỈ SỐ ---
+# --- HÀM VẼ GIAO DIỆN CHỈ SỐ (CLEAN HTML) ---
 def render_metric_card(label, value, delta=None, color=None):
     delta_html = ""
     if delta is not None:
         delta_color = "#00E676" if delta > 0 else ("#FF5252" if delta < 0 else "#888")
         arrow = "▲" if delta > 0 else ("▼" if delta < 0 else "")
-        delta_html = f"<div style='font-size:0.9rem; margin-top:5px; color:{delta_color}'>{arrow} {abs(delta):.1f} vs phiên trước</div>"
+        delta_val = f"{abs(delta):.1f}"
+        delta_html = f"<div style='font-size:0.9rem; margin-top:5px; color:{delta_color}'>{arrow} {delta_val} vs phiên trước</div>"
     
     if color:
         value_html = f"<div class='trend-badge' style='background-color:{color}'>{value}</div>"
@@ -284,15 +310,15 @@ col1, col2, col3 = st.columns([1, 2, 1])
 with col2:
     with st.form(key='search_form'):
         # Cấu trúc: Mã (To) - Checkbox (Nhỏ) - Số % (Vừa)
-        c_ticker, c_cb, c_val = st.columns([2, 0.6, 0.8])
+        c_ticker, c_cb, c_val = st.columns([1.5, 0.4, 0.6])
         
         with c_ticker:
             ticker_input = st.text_input("Mã cổ phiếu:", value="", placeholder="VD: HPG, VNM...").upper()
             
         with c_cb:
-            # Nhãn thủ công nằm trên
-            st.markdown('<p style="font-size: 1rem; font-weight: bold; margin-bottom: 0px; text-align: center;">Bật SL</p>', unsafe_allow_html=True)
-            # Checkbox nằm dưới, căn giữa cột
+            # Nhãn thủ công (Màu trắng, đậm, căn giữa)
+            st.markdown('<div class="custom-label">Bật SL</div>', unsafe_allow_html=True)
+            # Checkbox (ẩn label mặc định)
             use_sl = st.checkbox("use_sl_hidden", value=True, label_visibility="collapsed")
             
         with c_val:
