@@ -29,7 +29,7 @@ st.markdown("""
         font-weight: 400; margin-bottom: 20px; letter-spacing: 0.5px;
     }
 
-    /* DISCLAIMER */
+    /* DISCLAIMER BOX */
     .disclaimer-box {
         background-color: #1E1E1E; border: 1px solid #444; border-radius: 8px;
         padding: 20px; margin: 0 auto 30px auto; text-align: center; max-width: 800px;
@@ -40,7 +40,7 @@ st.markdown("""
     .d-line-2 { color: #E0E0E0; font-size: 1rem; font-weight: bold; margin-bottom: 5px; text-decoration: underline; text-decoration-color: #555; }
     .d-line-3 { color: #888; font-size: 0.85rem; font-style: italic; }
 
-    /* RESULT & REPORT */
+    /* RESULT CARD */
     .result-card {
         padding: 20px; border-radius: 12px; text-align: center; margin-bottom: 20px;
         border: 1px solid rgba(255,255,255,0.1); box-shadow: 0 4px 15px rgba(0,0,0,0.3);
@@ -52,12 +52,13 @@ st.markdown("""
     .result-title { font-size: 2.2rem; font-weight: 800; color: white; margin: 0; text-shadow: 0 2px 4px rgba(0,0,0,0.5); }
     .result-reason { font-size: 1.1rem; color: #EEE; margin-top: 10px; font-style: italic; }
 
+    /* REPORT BOX */
     .report-box { background-color: #1E1E1E; border: 1px solid #444; border-radius: 12px; padding: 25px; margin-top: 10px; }
     .report-header { color: #00E676; font-size: 1.2rem; font-weight: bold; margin-bottom: 15px; border-bottom: 1px solid #444; padding-bottom: 10px; text-transform: uppercase; }
     .report-item { margin-bottom: 12px; font-size: 1rem; color: #FAFAFA; display: flex; align-items: center; }
     .icon-dot { margin-right: 12px; font-size: 1.2rem; }
 
-    /* METRICS */
+    /* METRIC CARDS */
     .metric-container {
         background-color: #262730; border: 1px solid #41424C; border-radius: 12px;
         padding: 15px 10px; text-align: center; height: 160px;
@@ -71,7 +72,7 @@ st.markdown("""
     
     div.stButton > button { width: 100%; border-radius: 8px; font-weight: bold; height: 50px; font-size: 1.1rem; }
     
-    /* RADIO BUTTONS HORIZONTAL */
+    /* CUSTOM RADIO BUTTONS CHO TIME RANGE */
     div[data-testid="stRadio"] > label { display: none; }
     div[role="radiogroup"] { flex-direction: row; justify-content: center; }
 </style>
@@ -211,6 +212,7 @@ if submit_button or 'data' in st.session_state:
     else:
         symbol = ticker if ".VN" in ticker else f"{ticker}.VN"
         
+        # LOGIC TẢI DỮ LIỆU
         if 'data' not in st.session_state or st.session_state.get('current_symbol') != symbol:
             with st.spinner(f'Đang tải dữ liệu {ticker} (Toàn bộ lịch sử)...'):
                 try:
@@ -238,119 +240,117 @@ if submit_button or 'data' in st.session_state:
                     st.error(f"Lỗi tải dữ liệu: {e}")
                     st.stop()
 
-        df = st.session_state['data']
-        df_intra = st.session_state['data_intra']
-        rec, reason, bg_class, report = analyze_strategy(df)
-        curr = df.iloc[-1]; prev = df.iloc[-2]
+        # BẮT ĐẦU HIỂN THỊ (ĐÃ THÊM TRY-EXCEPT ĐỂ SỬA LỖI SYNTAX)
+        try:
+            df = st.session_state['data']
+            df_intra = st.session_state['data_intra']
+            rec, reason, bg_class, report = analyze_strategy(df)
+            curr = df.iloc[-1]; prev = df.iloc[-2]
 
-        st.markdown(f"<div class='result-card {bg_class}'><div class='result-title'>{rec}</div><div class='result-reason'>💡 Lý do: {reason}</div></div>", unsafe_allow_html=True)
-        st.markdown(report, unsafe_allow_html=True)
-        st.markdown("<br>", unsafe_allow_html=True)
-        
-        # --- BIỂU ĐỒ INTRADAY (ĐÃ SỬA MÀU & THAM CHIẾU) ---
-        if not df_intra.empty:
+            st.markdown(f"<div class='result-card {bg_class}'><div class='result-title'>{rec}</div><div class='result-reason'>💡 Lý do: {reason}</div></div>", unsafe_allow_html=True)
+            st.markdown(report, unsafe_allow_html=True)
+            st.markdown("<br>", unsafe_allow_html=True)
+            
+            # --- BIỂU ĐỒ INTRADAY ---
+            if not df_intra.empty:
+                st.divider()
+                latest_date = df_intra.index[0].strftime('%d/%m/%Y')
+                st.markdown(f"### ⏱️ Diễn biến giá trong ngày ({latest_date}) - {ticker}")
+                
+                # Giá tham chiếu = Giá đóng cửa ngày hôm trước trong dữ liệu lịch sử
+                ref_price = df['Close'].iloc[-2]
+                
+                # Màu sắc: Xanh nếu giá hiện tại > tham chiếu, Đỏ nếu ngược lại
+                current_price = df_intra['Close'].iloc[-1]
+                line_color = '#00E676' if current_price >= ref_price else '#FF5252'
+
+                fig_intra = go.Figure()
+                fig_intra.add_trace(go.Scatter(
+                    x=df_intra.index, y=df_intra['Close'], 
+                    mode='lines',
+                    line=dict(color=line_color, width=2),
+                    name='Giá Intraday'
+                ))
+                fig_intra.add_hline(y=ref_price, line_dash="dash", line_color="gray", annotation_text="Tham chiếu")
+
+                fig_intra.update_layout(
+                    height=350, xaxis_rangeslider_visible=False,
+                    paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
+                    font=dict(color='#FAFAFA'), margin=dict(l=10, r=10, t=10, b=10),
+                    xaxis=dict(showgrid=True, gridwidth=1, gridcolor='#333', tickformat="%H:%M"),
+                    yaxis=dict(showgrid=True, gridwidth=1, gridcolor='#333', autorange=True)
+                )
+                st.plotly_chart(fig_intra, use_container_width=True, config={'scrollZoom': False, 'displayModeBar': False})
+            else:
+                st.info("⚠️ Chưa có dữ liệu Intraday.")
+
+            col_m1, col_m2, col_m3, col_m4 = st.columns(4)
+            with col_m1: render_metric_card("GIÁ ĐÓNG CỬA", f"{curr['Close']:,.0f}", curr['Close'] - prev['Close'])
+            with col_m2: render_metric_card("RSI (14)", f"{curr['RSI']:.1f}", curr['RSI'] - prev['RSI'])
+            with col_m3: render_metric_card("ADX (14)", f"{curr['ADX']:.1f}", curr['ADX'] - prev['ADX'])
+            with col_m4:
+                trend_txt = "TĂNG" if curr['+DI'] > curr['-DI'] else "GIẢM"
+                render_metric_card("XU HƯỚNG", trend_txt, None, color="#00E676" if trend_txt == "TĂNG" else "#FF5252")
+
+            st.markdown("<br>", unsafe_allow_html=True)
             st.divider()
-            latest_date = df_intra.index[0].strftime('%d/%m/%Y')
-            st.markdown(f"### ⏱️ Diễn biến giá trong ngày ({latest_date}) - {ticker}")
             
-            # Lấy giá đóng cửa ngày hôm trước làm THAM CHIẾU
-            ref_price = df['Close'].iloc[-2] 
+            # --- BIỂU ĐỒ KỸ THUẬT ---
+            st.markdown(f"### 📊 Biểu đồ Kỹ Thuật ({ticker})")
+            time_tabs = st.radio("Chọn khung thời gian:", 
+                                ["1 Tháng", "3 Tháng", "6 Tháng", "1 Năm", "3 Năm", "Tất cả"], 
+                                horizontal=True, index=3)
             
-            # Xác định màu: Xanh nếu giá hiện tại > tham chiếu, Đỏ nếu < tham chiếu
-            current_price = df_intra['Close'].iloc[-1]
-            line_color = '#00E676' if current_price >= ref_price else '#FF5252'
+            df_chart = df.copy()
+            if time_tabs == "1 Tháng": df_chart = df.iloc[-22:]
+            elif time_tabs == "3 Tháng": df_chart = df.iloc[-66:]
+            elif time_tabs == "6 Tháng": df_chart = df.iloc[-132:]
+            elif time_tabs == "1 Năm": df_chart = df.iloc[-252:]
+            elif time_tabs == "3 Năm": df_chart = df.iloc[-756:]
 
-            fig_intra = go.Figure()
-            fig_intra.add_trace(go.Scatter(
-                x=df_intra.index, y=df_intra['Close'], 
-                mode='lines',
-                line=dict(color=line_color, width=2),
-                name='Giá Intraday'
-            ))
-            # Vẽ đường tham chiếu (Previous Close)
-            fig_intra.add_hline(y=ref_price, line_dash="dash", line_color="gray", annotation_text="Tham chiếu (Hôm qua)")
-
-            fig_intra.update_layout(
-                height=350, xaxis_rangeslider_visible=False,
-                paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
-                font=dict(color='#FAFAFA'), margin=dict(l=10, r=10, t=10, b=10),
-                xaxis=dict(showgrid=True, gridwidth=1, gridcolor='#333', tickformat="%H:%M"),
+            fig1 = go.Figure()
+            fig1.add_trace(go.Scatter(x=df_chart.index, y=df_chart['Upper'], line=dict(color='rgba(255,255,255,0.5)', width=1, dash='dash'), name="Upper Band"))
+            fig1.add_trace(go.Scatter(x=df_chart.index, y=df_chart['Lower'], line=dict(color='rgba(255,255,255,0.5)', width=1, dash='dash'), name="Lower Band"))
+            fig1.add_trace(go.Scatter(x=df_chart.index, y=df_chart['SMA20'], line=dict(color='#FF914D', width=1.5), name="SMA 20"))
+            fig1.add_trace(go.Candlestick(x=df_chart.index, open=df_chart['Open'], high=df_chart['High'], low=df_chart['Low'], close=df_chart['Close'], name="Giá"))
+            
+            fig1.update_layout(
+                height=500, xaxis_rangeslider_visible=False, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
+                font=dict(color='#FAFAFA'), margin=dict(l=10, r=10, t=10, b=40),
+                legend=dict(orientation="h", yanchor="top", y=-0.1, xanchor="center", x=0.5),
+                xaxis=dict(showgrid=True, gridwidth=1, gridcolor='#333'),
                 yaxis=dict(showgrid=True, gridwidth=1, gridcolor='#333', autorange=True)
             )
-            st.plotly_chart(fig_intra, use_container_width=True, config={'scrollZoom': False, 'displayModeBar': False})
-        else:
-            st.info("⚠️ Chưa có dữ liệu Intraday (Thị trường chưa mở cửa hoặc dữ liệu trễ).")
+            st.plotly_chart(fig1, use_container_width=True, config={'scrollZoom': False, 'displayModeBar': False})
 
-        col_m1, col_m2, col_m3, col_m4 = st.columns(4)
-        with col_m1: render_metric_card("GIÁ ĐÓNG CỬA", f"{curr['Close']:,.0f}", curr['Close'] - prev['Close'])
-        with col_m2: render_metric_card("RSI (14)", f"{curr['RSI']:.1f}", curr['RSI'] - prev['RSI'])
-        with col_m3: render_metric_card("ADX (14)", f"{curr['ADX']:.1f}", curr['ADX'] - prev['ADX'])
-        with col_m4:
-            trend_txt = "TĂNG" if curr['+DI'] > curr['-DI'] else "GIẢM"
-            render_metric_card("XU HƯỚNG", trend_txt, None, color="#00E676" if trend_txt == "TĂNG" else "#FF5252")
+            col_c1, col_c2 = st.columns(2)
+            
+            with col_c1:
+                st.markdown("### 🚀 Chỉ số RSI")
+                fig2 = go.Figure()
+                fig2.add_trace(go.Scatter(x=df_chart.index, y=df_chart['RSI'], line=dict(color='#E040FB', width=2), name="RSI"))
+                fig2.add_hline(y=70, line_dash="dot", line_color="#FF5252")
+                fig2.add_hline(y=30, line_dash="dot", line_color="#00E676")
+                fig2.update_layout(height=350, xaxis_rangeslider_visible=False, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
+                                font=dict(color='#FAFAFA'), margin=dict(l=10, r=10, t=10, b=40),
+                                legend=dict(orientation="h", yanchor="top", y=-0.15, xanchor="center", x=0.5),
+                                xaxis=dict(showgrid=True, gridwidth=1, gridcolor='#333'),
+                                yaxis=dict(showgrid=True, gridwidth=1, gridcolor='#333'))
+                st.plotly_chart(fig2, use_container_width=True, config={'scrollZoom': False})
 
-        st.markdown("<br>", unsafe_allow_html=True)
-        st.divider()
-        
-        # --- BIỂU ĐỒ KỸ THUẬT (ĐỒNG BỘ ZOOM) ---
-        st.markdown(f"### 📊 Biểu đồ Kỹ Thuật ({ticker})")
-        time_tabs = st.radio("Chọn khung thời gian:", 
-                             ["1 Tháng", "3 Tháng", "6 Tháng", "1 Năm", "3 Năm", "Tất cả"], 
-                             horizontal=True, index=3)
-        
-        df_chart = df.copy()
-        if time_tabs == "1 Tháng": df_chart = df.iloc[-22:]
-        elif time_tabs == "3 Tháng": df_chart = df.iloc[-66:]
-        elif time_tabs == "6 Tháng": df_chart = df.iloc[-132:]
-        elif time_tabs == "1 Năm": df_chart = df.iloc[-252:]
-        elif time_tabs == "3 Năm": df_chart = df.iloc[-756:]
+            with col_c2:
+                st.markdown("### ⚖️ Chỉ số ADX & DI")
+                fig3 = go.Figure()
+                fig3.add_trace(go.Scatter(x=df_chart.index, y=df_chart['ADX'], line=dict(color='white', width=2), name="ADX"))
+                fig3.add_trace(go.Scatter(x=df_chart.index, y=df_chart['+DI'], line=dict(color='#00E676', width=1.5), name="+DI"))
+                fig3.add_trace(go.Scatter(x=df_chart.index, y=df_chart['-DI'], line=dict(color='#FF5252', width=1.5), name="-DI"))
+                fig3.add_hline(y=25, line_dash="dot", line_color="gray")
+                fig3.update_layout(height=350, xaxis_rangeslider_visible=False, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
+                                font=dict(color='#FAFAFA'), margin=dict(l=10, r=10, t=10, b=40),
+                                legend=dict(orientation="h", yanchor="top", y=-0.15, xanchor="center", x=0.5),
+                                xaxis=dict(showgrid=True, gridwidth=1, gridcolor='#333'),
+                                yaxis=dict(showgrid=True, gridwidth=1, gridcolor='#333'))
+                st.plotly_chart(fig3, use_container_width=True, config={'scrollZoom': False})
 
-        # CHART 1: GIÁ
-        fig1 = go.Figure()
-        fig1.add_trace(go.Scatter(x=df_chart.index, y=df_chart['Upper'], line=dict(color='rgba(255,255,255,0.5)', width=1, dash='dash'), name="Upper Band"))
-        fig1.add_trace(go.Scatter(x=df_chart.index, y=df_chart['Lower'], line=dict(color='rgba(255,255,255,0.5)', width=1, dash='dash'), name="Lower Band"))
-        fig1.add_trace(go.Scatter(x=df_chart.index, y=df_chart['SMA20'], line=dict(color='#FF914D', width=1.5), name="SMA 20"))
-        fig1.add_trace(go.Candlestick(x=df_chart.index, open=df_chart['Open'], high=df_chart['High'], low=df_chart['Low'], close=df_chart['Close'], name="Giá"))
-        
-        fig1.update_layout(
-            height=500, xaxis_rangeslider_visible=False, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
-            font=dict(color='#FAFAFA'), margin=dict(l=10, r=10, t=10, b=40),
-            legend=dict(orientation="h", yanchor="top", y=-0.1, xanchor="center", x=0.5),
-            xaxis=dict(showgrid=True, gridwidth=1, gridcolor='#333'),
-            yaxis=dict(showgrid=True, gridwidth=1, gridcolor='#333', autorange=True)
-        )
-        st.plotly_chart(fig1, use_container_width=True, config={'scrollZoom': False, 'displayModeBar': False})
-
-        col_c1, col_c2 = st.columns(2)
-        
-        # CHART 2: RSI (ĐÃ ĐỒNG BỘ DATA)
-        with col_c1:
-            st.markdown("### 🚀 Chỉ số RSI")
-            fig2 = go.Figure()
-            fig2.add_trace(go.Scatter(x=df_chart.index, y=df_chart['RSI'], line=dict(color='#E040FB', width=2), name="RSI"))
-            fig2.add_hline(y=70, line_dash="dot", line_color="#FF5252")
-            fig2.add_hline(y=30, line_dash="dot", line_color="#00E676")
-            fig2.update_layout(height=350, xaxis_rangeslider_visible=False, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
-                              font=dict(color='#FAFAFA'), margin=dict(l=10, r=10, t=10, b=40),
-                              legend=dict(orientation="h", yanchor="top", y=-0.15, xanchor="center", x=0.5),
-                              xaxis=dict(showgrid=True, gridwidth=1, gridcolor='#333'),
-                              yaxis=dict(showgrid=True, gridwidth=1, gridcolor='#333'))
-            st.plotly_chart(fig2, use_container_width=True, config={'scrollZoom': False})
-
-        # CHART 3: ADX (ĐÃ ĐỒNG BỘ DATA)
-        with col_c2:
-            st.markdown("### ⚖️ Chỉ số ADX & DI")
-            fig3 = go.Figure()
-            fig3.add_trace(go.Scatter(x=df_chart.index, y=df_chart['ADX'], line=dict(color='white', width=2), name="ADX"))
-            fig3.add_trace(go.Scatter(x=df_chart.index, y=df_chart['+DI'], line=dict(color='#00E676', width=1.5), name="+DI"))
-            fig3.add_trace(go.Scatter(x=df_chart.index, y=df_chart['-DI'], line=dict(color='#FF5252', width=1.5), name="-DI"))
-            fig3.add_hline(y=25, line_dash="dot", line_color="gray")
-            fig3.update_layout(height=350, xaxis_rangeslider_visible=False, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
-                              font=dict(color='#FAFAFA'), margin=dict(l=10, r=10, t=10, b=40),
-                              legend=dict(orientation="h", yanchor="top", y=-0.15, xanchor="center", x=0.5),
-                              xaxis=dict(showgrid=True, gridwidth=1, gridcolor='#333'),
-                              yaxis=dict(showgrid=True, gridwidth=1, gridcolor='#333'))
-            st.plotly_chart(fig3, use_container_width=True, config={'scrollZoom': False})
-
-            except Exception as e:
-                st.error(f"Đã xảy ra lỗi hệ thống: {e}")
+        except Exception as e:
+            st.error(f"Đã xảy ra lỗi hiển thị: {e}")
