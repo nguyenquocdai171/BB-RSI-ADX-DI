@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 # --- CẤU HÌNH TRANG WEB ---
 st.set_page_config(layout="wide", page_title="Stock Advisor PRO", page_icon="📈")
 
-# --- CSS TÙY CHỈNH (ĐÃ CĂN CHỈNH FORM) ---
+# --- CSS TÙY CHỈNH ---
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700;900&display=swap');
@@ -40,7 +40,7 @@ st.markdown("""
     .d-line-2 { color: #E0E0E0; font-size: 1rem; font-weight: bold; margin-bottom: 5px; text-decoration: underline; text-decoration-color: #555; }
     .d-line-3 { color: #888; font-size: 0.85rem; font-style: italic; }
 
-    /* RESULT & METRICS */
+    /* RESULT CARD */
     .result-card {
         padding: 20px; border-radius: 12px; text-align: center; margin-bottom: 20px;
         border: 1px solid rgba(255,255,255,0.1); box-shadow: 0 4px 15px rgba(0,0,0,0.3);
@@ -52,11 +52,13 @@ st.markdown("""
     .result-title { font-size: 2.2rem; font-weight: 800; color: white; margin: 0; text-shadow: 0 2px 4px rgba(0,0,0,0.5); }
     .result-reason { font-size: 1.1rem; color: #EEE; margin-top: 10px; font-style: italic; }
 
+    /* REPORT BOX */
     .report-box { background-color: #1E1E1E; border: 1px solid #444; border-radius: 12px; padding: 25px; margin-top: 10px; }
     .report-header { color: #00E676; font-size: 1.2rem; font-weight: bold; margin-bottom: 15px; border-bottom: 1px solid #444; padding-bottom: 10px; text-transform: uppercase; }
     .report-item { margin-bottom: 12px; font-size: 1rem; color: #FAFAFA; display: flex; align-items: center; }
     .icon-dot { margin-right: 12px; font-size: 1.2rem; }
 
+    /* METRIC CARDS */
     .metric-container {
         background-color: #262730; border: 1px solid #41424C; border-radius: 12px;
         padding: 15px 10px; text-align: center; height: 160px;
@@ -70,39 +72,16 @@ st.markdown("""
     
     div.stButton > button { width: 100%; border-radius: 8px; font-weight: bold; height: 50px; font-size: 1.1rem; }
     
-    /* --- CĂN CHỈNH FORM NHẬP LIỆU (FIXED) --- */
-    
-    /* 1. Nhãn cho Input (Mã CP, Mức %) */
-    div[data-testid="stTextInput"] label, div[data-testid="stNumberInput"] label {
-        font-size: 0.9rem;
-        font-weight: 600;
-        margin-bottom: 0.5rem;
-    }
-
-    /* 2. Nhãn giả "Bật SL" */
-    .custom-label {
-        font-size: 0.9rem;
-        font-weight: 600;
-        margin-bottom: 0.5rem;
-        color: #FAFAFA; /* Màu giống label mặc định */
-        text-align: center;
-        display: block;
-    }
-
-    /* 3. Căn chỉnh ô Checkbox */
+    /* FIX CĂN CHỈNH FORM */
     div[data-testid="stCheckbox"] {
         display: flex;
-        justify-content: center; /* Căn giữa ngang */
-        align-items: center;     /* Căn giữa dọc */
-        height: 48px;            /* Chiều cao khớp với ô Input bên cạnh */
-        border: 1px solid transparent; /* Giữ khung */
-        margin-top: -2px; /* Tinh chỉnh nhỏ để khớp dòng kẻ */
+        align-items: center;
+        justify-content: center;
+        height: 50px; /* Khớp chiều cao input */
+        padding-bottom: 5px;
     }
-
-    /* 4. Phóng to nút tick */
     div[data-testid="stCheckbox"] label span {
-        transform: scale(1.8); /* Phóng to 1.8 lần là vừa đẹp */
-        background-color: transparent !important;
+        transform: scale(1.8); 
     }
     
     /* BACKTEST RESULT BOX */
@@ -151,29 +130,21 @@ def calculate_indicators(df):
     df['ADX'] = df['DX'].ewm(alpha=1/14, adjust=False).mean()
     return df
 
-# --- HÀM VẼ GIAO DIỆN CHỈ SỐ (CLEAN HTML) ---
+# --- HÀM VẼ GIAO DIỆN CHỈ SỐ (ĐÃ FIX LỖI HTML TRIỆT ĐỂ) ---
 def render_metric_card(label, value, delta=None, color=None):
     delta_html = ""
     if delta is not None:
         delta_color = "#00E676" if delta > 0 else ("#FF5252" if delta < 0 else "#888")
         arrow = "▲" if delta > 0 else ("▼" if delta < 0 else "")
-        delta_val = f"{abs(delta):.1f}"
-        delta_html = f"<div style='font-size:0.9rem; margin-top:5px; color:{delta_color}'>{arrow} {delta_val} vs phiên trước</div>"
+        delta_html = f"<div style='font-size:0.9rem; margin-top:5px; color:{delta_color}'>{arrow} {abs(delta):.1f} vs phiên trước</div>"
     
     if color:
         value_html = f"<div class='trend-badge' style='background-color:{color}'>{value}</div>"
     else:
         value_html = f"<div class='metric-value'>{value}</div>"
 
-    card_html = f"""
-    <div class='metric-container'>
-        <div class='metric-label'>{label}</div>
-        <div class='metric-value-box'>
-            {value_html}
-            {delta_html}
-        </div>
-    </div>
-    """
+    # Xóa indent để tránh lỗi markdown parser
+    card_html = f"<div class='metric-container'><div class='metric-label'>{label}</div><div class='metric-value-box'>{value_html}{delta_html}</div></div>"
     st.markdown(card_html, unsafe_allow_html=True)
 
 # --- LOGIC CHIẾN LƯỢC ---
@@ -309,16 +280,14 @@ st.markdown("""
 col1, col2, col3 = st.columns([1, 2, 1]) 
 with col2:
     with st.form(key='search_form'):
-        # Cấu trúc: Mã (To) - Checkbox (Nhỏ) - Số % (Vừa)
-        c_ticker, c_cb, c_val = st.columns([1.5, 0.4, 0.6])
+        # Căn chỉnh vertical_alignment="bottom" để các ô nhập liệu thẳng hàng đáy
+        c_ticker, c_cb, c_val = st.columns([2, 0.5, 0.8], vertical_alignment="bottom")
         
         with c_ticker:
             ticker_input = st.text_input("Mã cổ phiếu:", value="", placeholder="VD: HPG, VNM...").upper()
             
         with c_cb:
-            # Nhãn thủ công (Màu trắng, đậm, căn giữa)
-            st.markdown('<div class="custom-label">Bật SL</div>', unsafe_allow_html=True)
-            # Checkbox (ẩn label mặc định)
+            st.markdown('<p style="font-size:0.9rem; font-weight:600; text-align:center; margin-bottom:5px;">Bật SL</p>', unsafe_allow_html=True)
             use_sl = st.checkbox("use_sl_hidden", value=True, label_visibility="collapsed")
             
         with c_val:
