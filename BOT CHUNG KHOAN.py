@@ -4,6 +4,7 @@ import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
 import streamlit.components.v1 as components
+import random
 
 # --- CẤU HÌNH TRANG WEB ---
 st.set_page_config(layout="wide", page_title="Stock Advisor PRO", page_icon="📈")
@@ -27,7 +28,7 @@ st.markdown("""
         font-weight: 400; margin-bottom: 20px; letter-spacing: 0.5px;
     }
 
-    /* DISCLAIMER BOX (ĐÃ SỬA CĂN DÒNG) */
+    /* DISCLAIMER BOX (ĐÃ TÁCH DÒNG RÕ RÀNG) */
     .disclaimer-box {
         background-color: #1E1E1E; border: 1px solid #444; border-radius: 8px;
         padding: 20px; margin: 0 auto 30px auto; text-align: center; max-width: 800px;
@@ -35,11 +36,10 @@ st.markdown("""
     }
     .disclaimer-title { color: #FF5252; font-weight: bold; font-size: 1rem; text-transform: uppercase; margin-bottom: 15px; letter-spacing: 1px; }
     .disclaimer-line { 
-        color: #AAA; font-size: 0.95rem; line-height: 1.6; margin-bottom: 8px; 
-        border-bottom: 1px dashed #333; padding-bottom: 8px;
+        color: #AAA; font-size: 0.95rem; line-height: 1.8; margin-bottom: 8px; 
+        display: block; /* Xuống dòng */
     }
-    .disclaimer-line:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
-    .highlight-text { color: #E0E0E0; font-weight: 500; }
+    .highlight-text { color: #E0E0E0; font-weight: 700; }
 
     /* RESULT CARD */
     .result-card {
@@ -176,7 +176,7 @@ def render_metric_card(label, value, delta=None, color=None):
 st.markdown("<h1 class='main-title'>STOCK ADVISOR PRO</h1>", unsafe_allow_html=True)
 st.markdown("<p class='sub-title'>Hệ thống Hỗ trợ Phân tích & Quản trị Rủi ro Đầu tư</p>", unsafe_allow_html=True)
 
-# DISCLAIMER (ĐÃ TÁCH DÒNG)
+# DISCLAIMER (ĐÃ TÁCH DÒNG RIÊNG BIỆT)
 st.markdown("""
 <div class='disclaimer-box'>
     <div class='disclaimer-title'>⚠️ TUYÊN BỐ MIỄN TRỪ TRÁCH NHIỆM</div>
@@ -200,23 +200,23 @@ with col2:
         submit_button = st.form_submit_button(label='🚀 PHÂN TÍCH NGAY', use_container_width=True)
 
 if submit_button:
-    # --- JS HACK NÂNG CẤP (XỬ LÝ DỨT ĐIỂM FOCUS) ---
-    components.html("""
-        <script>
-            function blurInput() {
-                const inputs = window.parent.document.querySelectorAll('input[type="text"]');
-                inputs.forEach(input => {
-                    input.blur(); // Nhả chuột
-                });
-                // Thử focus vào body để chắc chắn thoát khỏi ô input
-                window.parent.document.body.focus();
-            }
-            // Chạy ngay khi load
-            blurInput();
-            // Chạy lại sau 300ms để đảm bảo Streamlit render xong
-            setTimeout(blurInput, 300);
-        </script>
-    """, height=0)
+    # --- JS HACK V2.0: CHẠY LẠI MỖI LẦN BẤM NÚT ---
+    # Sử dụng key ngẫu nhiên để ép component reload mỗi lần
+    js_hack = f"""
+    <script>
+        function blurInput() {{
+            const inputs = window.parent.document.querySelectorAll('input[type="text"]');
+            inputs.forEach(input => {{
+                input.blur();
+            }});
+            window.parent.document.body.focus();
+        }}
+        setTimeout(blurInput, 100);
+        setTimeout(blurInput, 500); // Chạy lại lần nữa cho chắc
+    </script>
+    <div style="display:none;">{random.random()}</div> 
+    """
+    components.html(js_hack, height=0)
 
     ticker = ticker_input.strip()
     
@@ -224,10 +224,10 @@ if submit_button:
         st.warning("⚠️ Vui lòng nhập mã cổ phiếu!")
     else:
         symbol = ticker if ".VN" in ticker else f"{ticker}.VN"
-        with st.spinner(f'Đang tải dữ liệu {ticker}...'):
+        with st.spinner(f'Đang tải dữ liệu {ticker} (Full lịch sử)...'):
             try:
-                # Tải 3 năm dữ liệu để hỗ trợ zoom dài hạn
-                data = yf.download(symbol, period="5y", interval="1d", progress=False)
+                # DỮ LIỆU MAX: Lấy toàn bộ lịch sử để Zoom
+                data = yf.download(symbol, period="max", interval="1d", progress=False)
                 if data.empty:
                     st.error(f"❌ Không tìm thấy mã **{ticker}**!")
                 else:
@@ -251,7 +251,21 @@ if submit_button:
                     st.markdown("<br>", unsafe_allow_html=True)
                     st.divider()
                     
-                    # --- CHART 1: GIÁ & BB (CÓ NÚT ZOOM, TẮT SCROLL) ---
+                    # CẤU HÌNH NÚT ZOOM (DÙNG CHUNG CHO CẢ 3 BIỂU ĐỒ)
+                    zoom_config = dict(
+                        buttons=list([
+                            dict(count=1, label="1T", step="month", stepmode="backward"),
+                            dict(count=3, label="3T", step="month", stepmode="backward"),
+                            dict(count=6, label="6T", step="month", stepmode="backward"),
+                            dict(count=1, label="1N", step="year", stepmode="backward"),
+                            dict(count=3, label="3N", step="year", stepmode="backward"),
+                            dict(count=5, label="5N", step="year", stepmode="backward"),
+                            dict(step="all", label="Tất cả")
+                        ]),
+                        bgcolor="#262730", activecolor="#00E676", font=dict(color="white")
+                    )
+
+                    # --- CHART 1: GIÁ & BB ---
                     st.markdown(f"### 📊 Biểu đồ Giá & Bollinger Bands ({ticker})")
                     fig1 = go.Figure()
                     fig1.add_trace(go.Scatter(x=df.index, y=df['Upper'], line=dict(color='rgba(255,255,255,0.5)', width=1, dash='dash'), name="Upper Band"))
@@ -259,31 +273,23 @@ if submit_button:
                     fig1.add_trace(go.Scatter(x=df.index, y=df['SMA20'], line=dict(color='#FF914D', width=1.5), name="SMA 20"))
                     fig1.add_trace(go.Candlestick(x=df.index, open=df['Open'], high=df['High'], low=df['Low'], close=df['Close'], name="Giá"))
                     
+                    # Mặc định hiển thị 1 năm gần nhất để trục Y đỡ bị nén
+                    default_start = df.index[-252] if len(df) > 252 else df.index[0]
+                    default_end = df.index[-1]
+
                     fig1.update_layout(
                         height=550, 
                         xaxis_rangeslider_visible=False,
                         paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
                         font=dict(color='#FAFAFA'), margin=dict(l=10, r=10, t=10, b=40),
                         legend=dict(orientation="h", yanchor="top", y=-0.15, xanchor="center", x=0.5),
-                        # Cấu hình nút Zoom thông minh
                         xaxis=dict(
                             showgrid=True, gridwidth=1, gridcolor='#333',
-                            rangeselector=dict(
-                                buttons=list([
-                                    dict(count=5, label="5 ngày", step="day", stepmode="backward"),
-                                    dict(count=1, label="1 tháng", step="month", stepmode="backward"),
-                                    dict(count=6, label="6 tháng", step="month", stepmode="backward"),
-                                    dict(count=1, label="1 năm", step="year", stepmode="backward"),
-                                    dict(count=3, label="3 năm", step="year", stepmode="backward"),
-                                    dict(step="all", label="Tất cả")
-                                ]),
-                                bgcolor="#262730", activecolor="#00E676", font=dict(color="white")
-                            )
+                            rangeselector=zoom_config,
+                            range=[default_start, default_end] # Set mặc định 1 năm
                         )
                     )
                     fig1.update_yaxes(showgrid=True, gridwidth=1, gridcolor='#333')
-                    
-                    # QUAN TRỌNG: Tắt scrollZoom để lướt điện thoại không bị kẹt
                     st.plotly_chart(fig1, use_container_width=True, config={'scrollZoom': False, 'displayModeBar': True})
 
                     col_c1, col_c2 = st.columns(2)
@@ -295,7 +301,8 @@ if submit_button:
                         fig2.add_hline(y=30, line_dash="dot", line_color="#00E676")
                         fig2.update_layout(height=350, xaxis_rangeslider_visible=False, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
                                           font=dict(color='#FAFAFA'), margin=dict(l=10, r=10, t=10, b=40),
-                                          legend=dict(orientation="h", yanchor="top", y=-0.2, xanchor="center", x=0.5))
+                                          legend=dict(orientation="h", yanchor="top", y=-0.2, xanchor="center", x=0.5),
+                                          xaxis=dict(showgrid=True, gridwidth=1, gridcolor='#333', rangeselector=zoom_config, range=[default_start, default_end]))
                         fig2.update_xaxes(showgrid=True, gridwidth=1, gridcolor='#333')
                         fig2.update_yaxes(showgrid=True, gridwidth=1, gridcolor='#333')
                         st.plotly_chart(fig2, use_container_width=True, config={'scrollZoom': False})
@@ -309,7 +316,8 @@ if submit_button:
                         fig3.add_hline(y=25, line_dash="dot", line_color="gray")
                         fig3.update_layout(height=350, xaxis_rangeslider_visible=False, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
                                           font=dict(color='#FAFAFA'), margin=dict(l=10, r=10, t=10, b=40),
-                                          legend=dict(orientation="h", yanchor="top", y=-0.2, xanchor="center", x=0.5))
+                                          legend=dict(orientation="h", yanchor="top", y=-0.2, xanchor="center", x=0.5),
+                                          xaxis=dict(showgrid=True, gridwidth=1, gridcolor='#333', rangeselector=zoom_config, range=[default_start, default_end]))
                         fig3.update_xaxes(showgrid=True, gridwidth=1, gridcolor='#333')
                         fig3.update_yaxes(showgrid=True, gridwidth=1, gridcolor='#333')
                         st.plotly_chart(fig3, use_container_width=True, config={'scrollZoom': False})
