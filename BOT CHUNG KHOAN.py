@@ -71,11 +71,13 @@ st.markdown("""
     
     div.stButton > button { width: 100%; border-radius: 8px; font-weight: bold; height: 50px; font-size: 1.1rem; }
     
-    /* CĂN CHỈNH FORM CHECKBOX */
+    /* CĂN CHỈNH & PHÓNG TO CHECKBOX */
     div[data-testid="stCheckbox"] {
+        transform: scale(2.2); /* Phóng to checkbox lên 2.2 lần */
+        margin-top: 10px;      /* Căn chỉnh vị trí xuống dưới */
+        margin-left: 10px;     /* Đẩy sang phải chút cho cân giữa cột */
         display: flex;
-        justify-content: center; /* Căn giữa checkbox */
-        padding-top: 10px; /* Đẩy checkbox xuống một chút cho cân */
+        align-items: center;
     }
     
     /* BACKTEST RESULT BOX */
@@ -282,14 +284,15 @@ col1, col2, col3 = st.columns([1, 2, 1])
 with col2:
     with st.form(key='search_form'):
         # Cấu trúc: Mã (To) - Checkbox (Nhỏ) - Số % (Vừa)
-        c_ticker, c_cb, c_val = st.columns([2, 0.5, 0.8])
+        c_ticker, c_cb, c_val = st.columns([2, 0.6, 0.8])
         
         with c_ticker:
             ticker_input = st.text_input("Mã cổ phiếu:", value="", placeholder="VD: HPG, VNM...").upper()
             
         with c_cb:
-            # Tạo nhãn thủ công để BẬT SL nằm trên, ô tick nằm dưới
-            st.markdown('<p style="font-size: 1rem; font-weight: bold; margin-bottom: 0px;">Bật SL</p>', unsafe_allow_html=True)
+            # Nhãn thủ công nằm trên
+            st.markdown('<p style="font-size: 1rem; font-weight: bold; margin-bottom: 0px; text-align: center;">Bật SL</p>', unsafe_allow_html=True)
+            # Checkbox nằm dưới, căn giữa cột
             use_sl = st.checkbox("use_sl_hidden", value=True, label_visibility="collapsed")
             
         with c_val:
